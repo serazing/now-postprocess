@@ -13,7 +13,7 @@ AUTHOR = 'Guillaume Serazin'
 AUTHOR_EMAIL = 'guillaume.serazin@unsw.edu.au'
 LICENSE = 'MIT'
 DESCRIPTION = 'Collection of funtions to process NOW outputs'
-LONG_DESCRIPTION = (open('README.rst').read() if exists('README.rst') else '')
+LONG_DESCRIPTION = (open('README.md').read() if exists('README.md') else '')
 VERSION = 0.1
 
 
