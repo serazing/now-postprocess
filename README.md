@@ -17,7 +17,14 @@ Once Miniconda is installed, you can create the conda environment required for r
 conda env create --file requirements.yml
 ```
 
-Then, just run:
+Clone the **now-posprocess** repository:
+```bash 
+git clone https://github.com/serazing/now-postprocess.git
+```
+
+
+Then activate the conda environment and install **now-posprocess** into the environment:
 ```bash
+conda activate now-postprocess
 python setup.py install
 ```
