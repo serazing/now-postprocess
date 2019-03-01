@@ -1,0 +1,15 @@
+name: now-postprocess
+channels:
+  - conda-forge
+dependencies:
+  - python=3.6
+  - netcdf4
+  - pandas
+  - xarray
+  - dask
+  - zarr
+  - jupyterlab
+  - cartopy
+  - matplotlib
+  - xgcm
+  - wrf-python
