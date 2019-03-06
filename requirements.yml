@@ -1,4 +1,4 @@
-name: now-postprocess
+name: now
 channels:
   - conda-forge
 dependencies:

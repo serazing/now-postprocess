@@ -4,7 +4,7 @@ from os.path import exists
 from setuptools import setup
 
 DISTNAME = 'now-postprocess'
-PACKAGES = ['now-postprocess']
+PACKAGES = ['now']
 TESTS = [p + '.tests' for p in PACKAGES]
 INSTALL_REQUIRES = ['numpy >= 1.11', 'matplotlib>=1.5']
 TESTS_REQUIRE = ['pytest >= 2.7.1']
