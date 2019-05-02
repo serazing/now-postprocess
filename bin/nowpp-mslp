@@ -1,0 +1,31 @@
+#!/usr/bin/env python
+
+import os
+import argparse
+
+description = ("Compute mean sea level pressure from WRF outputs using "
+               "a NCL script")
+
+parser = argparse.ArgumentParser(description=description)
+parser.add_argument('indir', nargs=1, help='Input directory')
+parser.add_argument('--outdir', nargs=1, required=True,
+                    default='./', help='Output directory')
+parser.add_argument('--year', required=True,
+                    help='The Rossby file climatology')
+args = parser.parse_args()
+
+# Loop parameters
+domain = 'd01'
+ncl_cmd = './runncl.sh calculate_mslp_arguments.ncl'
+
+for month in range(1, 13):
+    print('--> INPUT DIRECTORY: %s' % args.indir)
+    os.system('mkdir -p '+ args.outdir)
+    print('--> OUTPUT DIRECTORY: %s' % args.outdir)
+    file_out = '%s/WRF_mslp_%s_%04i-%02i.nc' % (args.outdir, domain,
+                                                args.year, month)
+    cmd = '%s %s %s %04i %02i' % (ncl_cmd, args.indir, args.outdir,
+                                  args.year, month)
+    print('--> NCL command: %s' % cmd)
+    if os.path.isfile(file_out):
+        os.system(cmd)

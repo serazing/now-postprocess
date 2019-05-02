@@ -16,15 +16,17 @@ DESCRIPTION = 'Collection of funtions to process NOW outputs'
 LONG_DESCRIPTION = (open('README.md').read() if exists('README.md') else '')
 VERSION = 0.1
 
-#SCRIPTS=['bin/make_zarr_datasets.py',
-#         'bin/compute_mean.py', 
-#         'bin/compute_eddy_terms.py']
+SCRIPTS  = ['bin/calculate_mslp_arguments.ncl'''
+            'bin/runncl.sh',
+            'bin/nowpp-mslp']
+
 #DATA_FILES=[('config', ['cfg/config.cfg'])]
 
 setup(name=DISTNAME,
       version=VERSION,
       description=DESCRIPTION,
       long_description=LONG_DESCRIPTION,
+      scripts=SCRIPTS,
       url=URL,
       author=AUTHOR,
       author_email=AUTHOR_EMAIL,
