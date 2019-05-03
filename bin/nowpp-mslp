@@ -7,8 +7,8 @@ description = ("Compute mean sea level pressure from WRF outputs using "
                "a NCL script")
 
 parser = argparse.ArgumentParser(description=description)
-parser.add_argument('indir', nargs=1, help='Input directory')
-parser.add_argument('--outdir', nargs=1, required=True,
+parser.add_argument('indir', nargs='?', help='Input directory')
+parser.add_argument('--outdir', nargs='?', required=True,
                     default='./', help='Output directory')
 parser.add_argument('--year', required=True,
                     help='The Rossby file climatology')
@@ -16,16 +16,17 @@ args = parser.parse_args()
 
 # Loop parameters
 domain = 'd01'
-ncl_cmd = './runncl.sh calculate_mslp_arguments.ncl'
+conda_bin = os.environ['CONDA_PREFIX'] + '/bin'
+ncl_cmd = 'runncl.sh %s/calculate_mslp_arguments.ncl' % conda_bin
 
 for month in range(1, 13):
     print('--> INPUT DIRECTORY: %s' % args.indir)
     os.system('mkdir -p '+ args.outdir)
     print('--> OUTPUT DIRECTORY: %s' % args.outdir)
-    file_out = '%s/WRF_mslp_%s_%04i-%02i.nc' % (args.outdir, domain,
-                                                args.year, month)
-    cmd = '%s %s %s %04i %02i' % (ncl_cmd, args.indir, args.outdir,
-                                  args.year, month)
+    #file_out = '%s/WRF_mslp_%s_%s-%02i.nc' % (args.outdir, domain,
+    #                                            args.year, month)
+    cmd = '%s %s %s %s %02i' % (ncl_cmd, args.indir, args.outdir, args.year, month)
     print('--> NCL command: %s' % cmd)
-    if os.path.isfile(file_out):
-        os.system(cmd)
+    os.system(cmd)
+    #if os.path.isfile(file_out):
+    #    os.system(cmd)

@@ -4,7 +4,7 @@ from os.path import exists
 from setuptools import setup
 
 DISTNAME = 'now-postprocess'
-PACKAGES = ['now']
+PACKAGES = ['nowpp']
 TESTS = [p + '.tests' for p in PACKAGES]
 INSTALL_REQUIRES = ['numpy >= 1.11', 'matplotlib>=1.5']
 TESTS_REQUIRE = ['pytest >= 2.7.1']
@@ -16,7 +16,7 @@ DESCRIPTION = 'Collection of funtions to process NOW outputs'
 LONG_DESCRIPTION = (open('README.md').read() if exists('README.md') else '')
 VERSION = 0.1
 
-SCRIPTS  = ['bin/calculate_mslp_arguments.ncl'''
+SCRIPTS  = ['bin/calculate_mslp_arguments.ncl',
             'bin/runncl.sh',
             'bin/nowpp-mslp']
 
