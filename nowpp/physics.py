@@ -2,7 +2,24 @@ from oocgcm.core.grids import VectorField2d
 from . import io
 
 
-def compute_wind_curl(config_file, taux, tauy):
+def wind_curl(config_file, taux, tauy):
+	"""
+	Compute the wind curl on NEMO C-grid evaluated at the 'F' point.
+
+	Parameters
+	----------
+	config_file : str
+		The configuration file including the path of the grid file
+	taux : xr.DataArray
+		The zonal wind stress evaluated at the 'U' point
+	tauy : xr.DataArray
+		The meridional wind stress evaluated at the 'V' point
+
+	Returns
+	-------
+	wind_curl : xr.DataArray
+		The wind curl evaluated at the 'F' point
+	"""
 	meshgrid = io.get_nemo_grid_from_config(config_file)
 	taux.attrs['grid_location'] = 'u'
 	tauy.attrs['grid_location'] = 'v'
@@ -13,15 +30,50 @@ def compute_wind_curl(config_file, taux, tauy):
 	return wind_curl.squeeze()
 
 
-def compute_geostrophic_velocities(config_file, sla):
+def geostrophic_velocities(config_file, ssh):
+	"""
+	Compute the geostrophic velocities from the sea level field on NEMO C-grid.
+
+	Parameters
+	----------
+	config_file : str
+		The configuration file including the path of the grid file
+	ssh : xr.DataArray
+		The sea surface height evaluated at the 'T' grid
+
+	Returns
+	-------
+	ux_geo : xr.DataArray
+		The zonal geostrophic velocity evaluated at the 'U' point
+	vy_geo : xr.DataArray
+		The meridional geostrophic velocity evaluated at the 'V' point
+	"""
 	meshgrid = io.get_nemo_grid_from_config(config_file)
-	sla.attrs['grid_location'] = 't'
-	ug = meshgrid.geostrophic_current_from_sea_surface_height(sla)
+	ssh.attrs['grid_location'] = 't'
+	ug = meshgrid.geostrophic_current_from_sea_surface_height(ssh)
 	ux_geo, vy_geo = ug.x_component.squeeze(), ug.y_component.squeeze() 
 	return ux_geo, vy_geo
 
 
-def compute_ke(config_file, ux, vy):
+def kinetic_energy(config_file, ux, vy):
+	"""
+	Compute the kinetic energy from the zonal and meridional velocities
+	on NEMO C-grid.
+
+	Parameters
+	----------
+	config_file : str
+		The configuration file including the path of the grid file
+	ux : xr.DataArray
+		The zonal velocity evaluated at the 'U' point
+	vy : xr.DataArray
+		The meridional velocity evaluated at the 'V' point
+
+	Returns
+	-------
+	ke : xr.DataArray
+		The kinetic energy evaluated at the 'T' point
+	"""
 	meshgrid = io.get_nemo_grid_from_config(config_file)
 	ux.attrs['grid_location'] = 'u'
 	vy.attrs['grid_location'] = 'v'
@@ -32,7 +84,29 @@ def compute_ke(config_file, ux, vy):
 	return ke.squeeze()
 
 
-def compute_wind_work(config_file, ux, vy, taux, tauy):
+def wind_energy_transfer(config_file, ux, vy, taux, tauy):
+	"""
+	Compute the wind work energy from the zonal and meridional velocities
+	on NEMO C-grid.
+
+	Parameters
+	----------
+	config_file : str
+		The configuration file including the path of the grid file
+	ux : xr.DataArray
+		The zonal velocity evaluated at the 'U' point
+	vy : xr.DataArray
+		The meridional velocity evaluated at the 'V' point
+	taux : xr.DataArray
+		The zonal wind stress evaluated at the 'U' point
+	tauy : xr.DataArray
+		The meridional wind stress evaluated at the 'V' point
+
+	Returns
+	-------
+	wind_energy : xr.DataArray
+		The transfer of energy from the wind evaluated at the 'T' point
+	"""
 	meshgrid = io.get_nemo_grid_from_config(config_file)
 	ux.attrs['grid_location'] = 'u'
 	vy.attrs['grid_location'] = 'v'
@@ -44,7 +118,7 @@ def compute_wind_work(config_file, ux, vy, taux, tauy):
 	tau = VectorField2d(taux, tauy, 
 						x_component_grid_location='u', 
 						y_component_grid_location='v')
-	wind_work = meshgrid.scalar_product(u, tau)
-	wind_work.attrs['long_name'] = 'Wind work'
-	wind_work.attrs['units'] = 'm3/s3'
-	return wind_work.squeeze()
+	wind_energy = meshgrid.scalar_product(u, tau)
+	wind_energy.attrs['long_name'] = 'Wind work'
+	wind_energy.attrs['units'] = 'm3/s3'
+	return wind_energy.squeeze()

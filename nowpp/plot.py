@@ -5,6 +5,7 @@ import cartopy.crs as ccrs
 import cartopy.feature as cfeature
 from cartopy.mpl.gridliner import LONGITUDE_FORMATTER, LATITUDE_FORMATTER
 
+
 def add_map(lon_min=-180, lon_max=180, lat_min=-90, lat_max=90,
             central_longitude=0., scale='auto', ax=None):
     """
