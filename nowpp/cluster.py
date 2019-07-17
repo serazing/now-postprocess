@@ -64,15 +64,16 @@ def raijin_cluster(cores=14, memory='64GB', processes=False, queue='expressbw',
                          dashboard_address=get_interface_ip('vlan192'),
                          **kwargs)
     client = Client(cluster)
-    cluster.job_header = ('#!/usr/bin/env bash\n'
-                          '#PBS -P %s\n'
-                          '#PBS -N dask-worker\n'
-                          '#PBS -q %s\n'
-                          '#PBS -l ncpus=%s\n'
-                          '#PBS -l mem=%s\n'
-                          '#PBS -l walltime=%s\n'
-                          'JOB_ID=${PBS_JOBID%.*}'
-                          % (PROJECT, queue, cores, memory, walltime))
+    cluster.job_header = (('#!/usr/bin/env bash\n'
+                           '#PBS -P %s\n'
+                           '#PBS -N dask-worker\n'
+                           '#PBS -q %s\n'
+                           '#PBS -l ncpus=%s\n'
+                           '#PBS -l mem=%s\n'
+                           '#PBS -l walltime=%s\n'
+                           'JOB_ID=${PBS_JOBID%.*}')
+                          % (PROJECT, queue, cores, memory, walltime)
+                          )
     return cluster, client
 
 
