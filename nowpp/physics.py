@@ -112,12 +112,12 @@ def wind_energy_transfer(config_file, ux, vy, taux, tauy):
 	vy.attrs['grid_location'] = 'v'
 	taux.attrs['grid_location'] = 'u'
 	tauy.attrs['grid_location'] = 'v'    
-	u = VectorField2d(ux, vy, 
-		          x_component_grid_location='u', 
-			  y_component_grid_location='v')
-	tau = VectorField2d(taux, tauy, 
-			    x_component_grid_location='u', 
-			    y_component_grid_location='v')
+	u = VectorField2d(ux, vy,
+					  x_component_grid_location='u',
+					  y_component_grid_location='v')
+	tau = VectorField2d(taux, tauy,
+						x_component_grid_location='u',
+						y_component_grid_location='v')
 	wind_energy = meshgrid.scalar_product(u, tau)
 	wind_energy.attrs['long_name'] = 'Wind work'
 	wind_energy.attrs['units'] = 'm3/s3'
@@ -145,13 +145,13 @@ def tracer_flux(config_file, ux, vy, tracer):
 	ugradT : xr.DataArray
 		The tracer flux evaluated at the 'T' point
 	"""
-	meshgrid = now.io.get_nemo_grid_from_config(config_file)
-   	ux.attrs['grid_location'] = 'u'
-   	vy.attrs['grid_location'] = 'v'
-   	tracer.attrs['grid_location'] = 't'
-   	u = VectorField2d(ux, vy, 
-                      x_component_grid_location='u', 
-                      y_component_grid_location='v')
-   	gradT = meshgrid.horizontal_gradient(tracer)
-   	ugradT = meshgrid.scalar_product(u, gradT)
+	meshgrid = io.get_nemo_grid_from_config(config_file)
+	ux.attrs['grid_location'] = 'u'
+	vy.attrs['grid_location'] = 'v'
+	tracer.attrs['grid_location'] = 't'
+	u = VectorField2d(ux, vy,
+					  x_component_grid_location='u',
+					  y_component_grid_location='v')
+	gradT = meshgrid.horizontal_gradient(tracer)
+	ugradT = meshgrid.scalar_product(u, gradT)
 	return ugradT.squeeze()
