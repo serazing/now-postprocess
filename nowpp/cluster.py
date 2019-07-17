@@ -28,7 +28,7 @@ def vdi_cluster(**kwargs):
     return cluster, client
 
 
-def raijin_cluster(cores=14, memory='64GB', processes=False, queue='expressbw',
+def raijin_cluster(cores=14, memory='64GB', processes=1, queue='expressbw',
                    walltime='01:00:00', **kwargs):
     """
     Start a local cluster on VDI using dask
@@ -70,9 +70,9 @@ def raijin_cluster(cores=14, memory='64GB', processes=False, queue='expressbw',
                            '#PBS -q %s\n'
                            '#PBS -l ncpus=%s\n'
                            '#PBS -l mem=%s\n'
-                           '#PBS -l walltime=%s\n'
-                           'JOB_ID=${PBS_JOBID%.*}')
+                           '#PBS -l walltime=%s\n')
                           % (PROJECT, queue, cores, memory, walltime)
+                          + 'JOB_ID=${PBS_JOBID%.*}'
                           )
     return cluster, client
 
