@@ -48,3 +48,29 @@ def compute_wind_work(config_file, ux, vy, taux, tauy):
 	wind_work.attrs['long_name'] = 'Wind work'
 	wind_work.attrs['units'] = 'm3/s3'
 	return wind_work.squeeze()
+
+
+def compute_tracer_flux(config_file, ux, vy, tracer):
+    meshgrid = now.io.get_nemo_grid_from_config(config_file)
+    ux.attrs['grid_location'] = 'u'
+    vy.attrs['grid_location'] = 'v'
+    tracer.attrs['grid_location'] = 't'
+    u = VectorField2d(ux, vy, 
+                      x_component_grid_location='u', 
+                      y_component_grid_location='v')
+    gradT = meshgrid.horizontal_gradient(tracer)
+    ugradT = meshgrid.scalar_product(u, gradT)
+    return ugradT.squeeze()
+
+
+def compute_wind_curl(config_file, taux, tauy):
+    meshgrid = now.io.get_nemo_grid_from_config(config_file)
+    taux.attrs['grid_location'] = 'u'
+    tauy.attrs['grid_location'] = 'v'
+    tau = VectorField2d(taux, tauy, 
+                        x_component_grid_location='u', 
+                        y_component_grid_location='v')
+    curl = meshgrid.vertical_component_of_curl(tau)
+    return curl.squeeze()
+    
+    

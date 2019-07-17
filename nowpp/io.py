@@ -1,8 +1,9 @@
 import xarray as xr
 import os
 from oocgcm.oceanmodels.nemo import grids
-
-# Config file
+import pandas as pd
+#------------------------------------------------------------
+# Config file sectopm
 #------------------------------------------------------------
 def read_config_file(config_file):
     from configparser import ConfigParser
@@ -20,17 +21,23 @@ def _check_simulations(config_file, simulations):
         simulations = [simulations,]
     return simulations
 
-def get_nemo_grid_from_config(config_file):
-	cfg = read_config_file(config_file)
-	nemo_grid = grids.nemo_2d_grid(nemo_coordinate_file=cfg['NEMO']['MeshGridFile'],
-								   nemo_byte_mask_file=cfg['NEMO']['MaskFile'])
-	return nemo_grid
 
+#------------------------------------------------------------
+# NEMO section
+#------------------------------------------------------------
+def get_nemo_grid_from_config(config_file):
+    cfg = read_config_file(config_file)
+    nemo_grid = grids.nemo_2d_grid(nemo_coordinate_file=cfg['NEMO']['MeshGridFile'],
+                                   nemo_byte_mask_file=cfg['NEMO']['MaskFile'])
+    return nemo_grid
+
+    
 def get_nemo_meshgrid(config_file):
     cfg = read_config_file(config_file)
     meshgrid_file = cfg['NEMO']['MeshGridFile']
     meshgrid = xr.open_dataset(meshgrid_file).squeeze()
     return meshgrid
+
 
 def get_nemo_filenames_from_config(config_file, simulation, 
                                    grid='T'):
@@ -80,7 +87,11 @@ def get_nemo_filenames_from_config(config_file, simulation,
             return full_filenames    
 
         
-def get_wrf_filenames_from_config(config_file, simulation):
+#------------------------------------------------------------
+# WRF section
+#------------------------------------------------------------ 
+def get_wrf_filenames_from_config(config_file, simulation, prefix='wrfout'):
+ 
     """
     Get the full path of WRF filenames from the configuration file
     for a particular simulation and a particular grid
@@ -113,11 +124,11 @@ def get_wrf_filenames_from_config(config_file, simulation):
     for section in cfg:
         if section == simulation: 
             main_path = cfg[simulation]['Path']                     
-            filenames = '%s_*_%s_*.nc' %(wrf_prefix,
+            filenames = '%s_*_%s_*.nc' %(prefix,
                                          wrf_freq)
             full_filenames = main_path + wrf_path + filenames
             return full_filenames
-
+        
         
 def get_nemo_zarr_folder_from_config(config_file, simulation, grid='U'):
     cfg = read_config_file(config_file)
@@ -232,25 +243,44 @@ def open_nemo_griddata_from_zarr(config_file, simulations=None,
 
 # WRF Section
 # ------------------------------------------------------------
-def open_wrfout_griddata_from_netcdf(config_file, pressure_levels,
-                                     simulations=None, **kwargs):
+
+def get_wrf_meshgrid(config_file):
+    cfg = read_config_file(config_file)
+    meshgrid_file = cfg['WRF']['MeshGridFile']
+    meshgrid = xr.open_dataset(meshgrid_file).squeeze()
+    return meshgrid
+
+
+def open_wrf_griddata_from_netcdf(config_file, simulations=None,
+                                  prefix='wrfout', domain='d01', 
+                                  variables=None, year=None,
+                                  grid=True, **kwargs):
     """
-    Get the full path of NEMO filenames from the configuration file
-    for a particular simulation and a particular grid
+    Open WRF netCDF from the configuration file
     
     Parameters
     ----------
     config_file : str
         The path of the configuration file
-    simlation : str or list of str
-        Names of simulations to open as written in the configuration file 
+    simulation : str or list of str, optional
+        Names of simulations to open as written in the configuration file
+    prefix : str, optional
+        The prefix of WRF output files (usually 'wrfout' or 'wrfhrly'). 
+    domain : str, optional
+        The name of the WRF domain ('d01' is the parent domain by default).
+    variables : list of str, optional
+        A list of variables to read
+    year : int, optional
+        A specific year to read
+    grid : bool, optional
+        If True, metric from the grid file is added to the Dataset
     **kwargs : optional
         Additional arguments passed on to `xarray.open_mfdataset`
     
     Returns
     -------
     griddata : xarray.Dataset
-        The NEMO outputs represented by a Dataset
+        The WRF outputs represented by a Dataset
     """
     cfg = read_config_file(config_file)
     if simulations is None:
@@ -259,37 +289,61 @@ def open_wrfout_griddata_from_netcdf(config_file, pressure_levels,
     elif not isinstance(simulations, (list, tuple)):
         simulations = [simulations,]
     list_of_gdata = []
-    for sim in simulations:
-        gdata = _open_wrfout_from_netcdf(config_file, pressure_levels, 
-                                         sim,  **kwargs)
+    for sim in simulations:        
+        gdata = _open_wrf_griddata_from_netcdf(config_file, 
+                                               sim, 
+                                               prefix=prefix, 
+                                               domain=domain, 
+                                               variables=variables, 
+                                               year=year,
+                                               grid=grid, 
+                                               **kwargs)
         list_of_gdata.append(gdata)
     griddata = xr.concat(list_of_gdata, dim='simulation')
     griddata['simulation'] = simulations
     return griddata
 
 
-def _open_wrfout_from_netcdf(config_file, pressure_levels, simulation, 
-                             **kwargs):   
-    list_of_griddata = []
+def _open_wrf_griddata_from_netcdf(config_file, simulation,
+                                   prefix='wrfout', domain='d01', 
+                                   variables=None, year=None,
+                                   grid=True, **kwargs):
+    cfg = read_config_file(config_file)
+    main_path = cfg[simulation]['Path']    
+    year_start = cfg['GENERAL']['YearStart']
+    year_stop = cfg['GENERAL']['YearStop']    
     try:
-        griddata_10m =_open_wrfout_plev_from_netcdf(config_file, simulation,
-                                                    "10m", **kwargs)
-    except IOError:
-        print("Fields at 10m are not available for simulation %s" %simulation)
-    # Iterates on pressure level
-    for plev in pressure_levels:
-        griddata_plev =_open_wrfout_plev_from_netcdf(config_file, simulation,
-                                                    plev, **kwargs)   
-        _rename_wrfout_plev_variables(griddata_plev)        
-        list_of_griddata.append(griddata_plev)
-    plev_dim = xr.DataArray(pressure_levels, dims='pressure')
-    wrf_griddata = xr.concat(list_of_griddata, dim=plev_dim)
+        wrf_path = cfg['WRF']['NetCDFPath']
+    except KeyError:
+        wrf_path = './'
     try:
-        wrf_griddata = xr.merge([griddata_10m, wrf_griddata])
-    except UnboundLocalError:
-        # Skip the merging if the surface fields are not found
-        pass
-    return wrf_griddata
+        wrf_freq = cfg['WRF']['Frequency']
+    except:
+        wrf_freq = '*'
+    try:
+        wrf_prefix = cfg['WRF']['Prefix']
+    except:
+        wrf_prefix = prefix
+    if year is None:
+        year = '*'
+    filenames = '%s_%s_%s-*' %(wrf_prefix, domain, year)
+    full_filenames = main_path + wrf_path + filenames
+    ds = xr.open_mfdataset(full_filenames, concat_dim='Time',  
+                           decode_coords=False, decode_times=False,
+                           decode_cf=False, 
+                           drop_variables=['XLON', 'XLAT'], 
+                           **kwargs)
+    ds = xr.decode_cf(ds)
+    time = pd.to_datetime(ds.Times.load().astype('str'), format='%Y-%m-%d_%H:%M:%S')
+    ds = ds.assign_coords(Time=time).rename({'Time': 'time'})
+    if variables is not None:
+        ds = ds[variables]
+    if grid:
+        meshgrid = get_wrf_meshgrid(config_file)
+        ds = ds.assign_coords(XLAT=meshgrid.XLAT_M, 
+                              XLONG=meshgrid.XLONG_M, 
+                              LANDMASK=meshgrid.LANDMASK)
+    return ds
 
 
 def _open_wrfout_plev_from_netcdf(config_file, simulation, plev, **kwargs):
@@ -311,7 +365,7 @@ def _open_wrfout_plev_from_netcdf(config_file, simulation, plev, **kwargs):
         prefix = '*'     
     list_of_griddata = []  
     # First level is at the 10 meter high
-    filenames = '%s_*_%s_%s.nc' %(wrf_prefix, wrf_freq, plev)
+    filenames = '%s_%s_%s.nc' %(wrf_prefix, wrf_freq, plev)
     full_filenames = main_path + wrf_path + filenames
     griddata_plev = xr.open_mfdataset(full_filenames, 
                                       concat_dim='Time', 
@@ -323,37 +377,47 @@ def _open_wrfout_plev_from_netcdf(config_file, simulation, plev, **kwargs):
 # NETCDF to ZARR section
 #------------------------
 def netcdf_to_zarr(config_file, simulations=None,
-                   nemo=True, wrf=True, nemo_grids=['U', 'V', 'T'],
+                   variables=None,
+                   nemo=True, wrf=True, 
+                   nemo_grids=['U', 'V', 'T'],
                    nemo_chunks={'time_counter': 500},
-                   wrf_chunks={'time': 500}, overwrite=False):
-    from numcodecs import Blosc
-    compressor = Blosc(cname='zstd', clevel=1, shuffle=2)
+                   wrf_chunks={'time': 500}, 
+                   overwrite=False, compute=True):
+    from zarr import Blosc
+    compressor = Blosc(cname='zstd', clevel=3, shuffle=0)
     cfg = read_config_file(config_file)
     simulations = _check_simulations(config_file, simulations)
+    list_of_res = []
     for sim in simulations:
         if nemo:
             for grid in nemo_grids:
                 griddata = open_nemo_griddata_from_netcdf(config_file, simulations=sim,
                                                           grid=grid, parallel=True,
                                                           chunks={'time_counter': 1})
-                print(griddata)
+                if variables is not None:
+                    griddata = griddata[variables]
                 zarr_path = get_nemo_zarr_folder_from_config(config_file, sim, grid=grid)
-                encoding = {var: {'compressor': compressor} for var in griddata.variables}
+                #encoding = {var: {'compressor': compressor} for var in griddata.variables}
+                encoding = {var: {'compressor': None} for var in griddata.variables}
                 print(zarr_path)
                 # Rechunk and save to the zarr format
                 if not os.path.isdir(zarr_path):
-                    griddata.chunk(nemo_chunks).to_zarr(zarr_path, mode='w-', 
-                                                        encoding=encoding)
+                    res = griddata.chunk(nemo_chunks).to_zarr(zarr_path, mode='w-', 
+                                                              encoding=encoding, 
+                                                              compute=compute)
                 elif os.path.isdir(zarr_path) and overwrite:
-                    griddata.chunk(nemo_chunks).to_zarr(zarr_path, mode='w',
-                                                        encoding=encoding)
+                    res = griddata.chunk(nemo_chunks).to_zarr(zarr_path, mode='w',
+                                                              encoding=encoding,
+                                                              compute=compute)
                 else:
                     print("Skipping the conversion to zarr of grid %s of" 
                           " simulation %s because the folder aready "
                           "exits." %(grid, sim))
+                list_of_res.append(res)
         if wrf:
             raise NotImplementedError
-        
+    return list_of_res
+
 
 def _rename_wrfout_plev_variables(griddata, 
                                   list_of_variables=['U', 'V', 'W', 
