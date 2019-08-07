@@ -2,7 +2,7 @@ import numpy as np
 import xarray as xr
 import pandas as pd
 import wrf
-
+from . import geometry
 
 def get_cyclone_properties(cyclone_tracking):
     """
@@ -29,16 +29,20 @@ def get_cyclone_properties(cyclone_tracking):
     month = get_attribute(3) # MONTH
     day = get_attribute(4) # DAY
     hour = get_attribute(5) # HOUR
+    dt = float(cyclone_tracking.temporal_scale_hours)
+    duration = get_attribute(25).isel(TimeSteps=0) * dt
     # Create a Dataset gathering the different variable
     cyclone_data = xr.Dataset({'lat': lat, 'lon': lon,
                            'pressure_gradient': pressure_gradient,
                            'pressure': pressure,
                            'laplacian': laplacian,
                            'size': size,
+                           'duration': duration,
                            'year': year,
                            'month': month,
                            'day': day,
                            'hour': hour})
+    cyclone_data.attrs['dt'] = dt
     # Cleaning data and renaming dimensions and
     cyclone_data = cyclone_data.where((np.abs(lat) < 90) &
                                       (laplacian < 1e10) &
@@ -47,7 +51,36 @@ def get_cyclone_properties(cyclone_tracking):
     cyclone_data = cyclone_data.rename({'ECLevent': 'event',
                                         'TimeSteps': 'time'})
     cyclone_data = cyclone_data.set_coords(('lat', 'lon'))
+    cyclone_data = cyclone_data.assign(event=range(cyclone_data.sizes['event']),
+                                       time=range(cyclone_data.sizes['time']))
     return cyclone_data
+
+
+def assign_cyclone_trajectory(cyclone_data, dim='time'):
+    """
+    Compute and assign the trajectory of the cyclone in a new dataset. The
+    trajectory of the cyclone consists in a speed translation and an angle.
+
+    Paraneters
+    ----------
+    cyclone_data: xr.Dataset
+        The cyclone dataset
+    dim : str, optional
+        The name of the time dimension
+
+    Returns
+    -------
+    res : xr.Dataset
+        The cyclone dataset with information about the trajectories added
+    """
+    angle = geometry.latlon2heading(cyclone_data['lat'], cyclone_data['lon'],
+                                    dim)
+    dy, dx = geometry.latlon2dydx(cyclone_data['lat'], cyclone_data['lon'],
+                                  dim)
+    dt = cyclone_data.attrs['dt'] * 3600
+    u, v = dx /dt, dy /dt
+    speed = np.sqrt(u ** 2 + v ** 2)
+    return cyclone_data.assign(speed=speed, angle=angle)
 
 
 def assign_time_and_location(cyclone_data, wrf_grid):
