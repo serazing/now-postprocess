@@ -60,21 +60,24 @@ def raijin_cluster(cores=14, memory='64GB', processes=1, queue='expressbw',
     cluster = PBSCluster(cores=cores,
                          memory=memory,
                          processes=processes,
-                         ip=get_interface_ip('ib0'),
-                         dashboard_address=get_interface_ip('vlan192'),
+                         interface='ib0',
+                         #dashboard_address=get_interface_ip('vlan192'),
+                         queue=queue,
+                         resource_spec='ncpus=%s,mem=%s' % (cores, memory), 
+			 job_extra=['-P %s' % PROJECT],
                          **kwargs)
-    client = Client(cluster)
-    cluster.job_header = (('#!/usr/bin/env bash\n'
-                           '#PBS -P %s\n'
-                           '#PBS -N dask-worker\n'
-                           '#PBS -q %s\n'
-                           '#PBS -l ncpus=%s\n'
-                           '#PBS -l mem=%s\n'
-                           '#PBS -l walltime=%s\n')
-                          % (PROJECT, queue, cores, memory, walltime)
-                          + 'JOB_ID=${PBS_JOBID%.*}'
-                          )
-    return cluster, client
+    #cluster.job_header = (('#!/usr/bin/env bash\n'
+    #                       '#PBS -P %s\n'
+    #                       '#PBS -N dask-worker\n'
+    #                       '#PBS -q %s\n'
+    #                       '#PBS -l ncpus=%s\n'
+    #                       '#PBS -l mem=%s\n'
+    #                       '#PBS -l walltime=%s\n')
+    #                      % (PROJECT, queue, cores, memory, walltime)
+    #                      + 'JOB_ID=${PBS_JOBID%.*}'
+    #                      )
+    #client = Client(cluster)
+    return cluster
 
 
 def get_interface_ip(ifname):
