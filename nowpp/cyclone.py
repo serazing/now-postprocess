@@ -103,16 +103,34 @@ def assign_time_and_location(cyclone_data, wrf_grid):
     return ecl_location.unstack('disk')
 
 
-def match_events(ecl, ecl_ref, delta_hours = 24., delta_x = 600):
-    ds_ref = ecl_ref.rename({'event': 'event_ref','time': 'time_ref'})
-    coord_ref = xr.IndexVariable('event_ref', range(ds_ref.sizes['event_ref']))
-    ds_ref = ds_ref.assign_coords(event_ref=coord_ref)
+def match_cyclone_events(cyclone_test, cyclone_ref, delta_hours = 24., delta_x = 600):
+    """
+    Match similar cyclone events between two simulations
+    
+    Parameters
+    ----------
+    cyclone_test : xr.Dataset
+        The cyclone tested dataset to be tested against the reference dataset
+    cyclone_ref : 
+        The cyclone reference dataset
+    delta_hours : float, optional
+        Default is 24 hr.
+    delta_x : float, optional
+        Default is 600 km.
+        
+    Returns
+    -------
+    event_test : 
+        The indices of events in the tested dataset
+    event_ref : 
+        The indices of events in the reference dataset    
+    """
+    ds_ref = cyclone_ref.rename({'event': 'event_ref','time': 'time_ref'})
+    ds_ref = ds_ref.assign_coords(event_ref=xr.IndexVariable('event_ref', range(ds_ref.sizes['event_ref'])))
     ds_ref_stacked = ds_ref.stack(pass_ref=('event_ref', 'time_ref'))\
                      .dropna('pass_ref').chunk({'pass_ref': 5e3})
-
-    ds_test = ecl.rename({'event': 'event_test','time': 'time_test'})
-    coord_test = xr.IndexVariable('event_test', range(ds_test.sizes['event_test']))
-    ds_test = ds_test.assign_coords(event_test=coord_test)
+    ds_test = cyclone_test.rename({'event': 'event_test','time': 'time_test'})
+    ds_test = ds_test.assign_coords(event_test=xr.IndexVariable('event_test', range(ds_test.sizes['event_test'])))
     ds_test_stacked = ds_test.stack(pass_test=('event_test', 'time_test'))\
                       .dropna('pass_test').chunk({'pass_test': 5e3})
     EARTH_RADIUS = 6371 * 1e3
@@ -120,7 +138,7 @@ def match_events(ecl, ecl_ref, delta_hours = 24., delta_x = 600):
     dt = np.abs(ds_test_stacked['time_counter'] - ds_ref_stacked['time_counter'])
     dlon = ds_test_stacked['lon'] - lon_ref
     dlat = ds_test_stacked['lat'] - lat_ref
-    dx = np.cos(np.pi / 180. * lat_ref) * np.pi / 180. * EARTH_RADIUS * dlon
+    dx = np.cos(np.pi / 180. * lat_ref) * np.pi / 180. * EARTH_RADIUS * dlon    
     dy = np.pi / 180. * EARTH_RADIUS * dlat
     distance = 1e-3 * np.sqrt(dx ** 2 + dy **2)
     score = np.sqrt((distance / delta_x) ** 2 + (dt / delta_hours) ** 2)
