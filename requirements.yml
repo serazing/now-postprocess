@@ -1,15 +1,22 @@
-name: now
+name: now-postprocess
 channels:
   - conda-forge
 dependencies:
-  - python=3.6
-  - netcdf4
-  - pandas
-  - xarray
-  - dask
-  - zarr
+  - python>=3.6
   - jupyterlab
-  - cartopy
-  - matplotlib
-  - xgcm
+  - nb_conda 
+  - xarray
+  - pandas
+  - dask
+  - dask-jobqueue
+  - netcdf4
+  - zarr
+  - numpy
+  - scipy
   - wrf-python
+  - xgcm
+  - matplotlib
+  - cartopy
+  - seaborn
+  - cmocean
+  - colorcet
