@@ -79,9 +79,10 @@ def get_nemo_filenames_from_config(config_file, simulation,
         nemo_freq = '*'        
     for section in cfg:
         if section == simulation: 
-            main_path = cfg[simulation]['Path']
+            main_path = '%s/%s/' % (cfg['GENERAL']['WorkDir'],
+                                    cfg[simulation]['SimName'])
             try:
-                prefix = cfg[simulation]['Prefix']  
+                prefix = cfg[simulation]['NemoPrefix']  
             except KeyError:
                 prefix = '*' 
             filenames = '%s_%s_*_*_grid_%s_%s.nc' %(prefix,
@@ -215,6 +216,7 @@ def open_nemo_griddata_from_netcdf(config_file, simulations=None,
     mask = get_nemo_mask(config_file, grid=grid)
     for sim in simulations:
         filenames = get_nemo_filenames_from_config(config_file, sim, grid=grid)
+        print(filenames)
         gdata = xr.open_mfdataset(filenames, **kwargs)
         # Rename time_counter
         gdata = gdata.set_index(time_counter='time_average_1d')
@@ -385,8 +387,8 @@ def netcdf_to_zarr(config_file, simulations=None,
                    variables=None,
                    nemo=True, wrf=True, 
                    nemo_grids=['U', 'V', 'T'],
-                   nemo_chunks={'time_counter': 500},
-                   wrf_chunks={'time': 500}, 
+                   nemo_chunks={'time_counter': 300},
+                   wrf_chunks={'time': 300}, 
                    overwrite=False, compute=True):
     from zarr import Blosc
     compressor = Blosc(cname='zstd', clevel=3, shuffle=0)
@@ -402,9 +404,7 @@ def netcdf_to_zarr(config_file, simulations=None,
                 if variables is not None:
                     griddata = griddata[variables]
                 zarr_path = get_nemo_zarr_folder_from_config(config_file, sim, grid=grid)
-                #encoding = {var: {'compressor': compressor} for var in griddata.variables}
-                encoding = {var: {'compressor': None} for var in griddata.variables}
-                print(zarr_path)
+                encoding = {var: {'compressor': compressor} for var in griddata.variables}
                 # Rechunk and save to the zarr format
                 if not os.path.isdir(zarr_path):
                     res = griddata.chunk(nemo_chunks).to_zarr(zarr_path, mode='w-', 
