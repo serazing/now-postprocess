@@ -19,7 +19,7 @@ VERSION = 0.1
 SCRIPTS  = ['bin/calculate_mslp_arguments.ncl',
             'bin/runncl.sh',
             'bin/nowpp-mslp',
-            'bin/mdss_get']
+            'bin/nowpp-get']
 
 #DATA_FILES=[('config', ['cfg/config.cfg'])]
 
