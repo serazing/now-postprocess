@@ -47,8 +47,10 @@ for sim in simulations:
                              cfg['NEMO']['Frequency'], grid,
                              cfg['NEMO']['Dimensions'])
                           )
-                dest = '%s/%s' % (cfg['GENERAL']['WorkDir'],
-                                  cfg[sim]['SimName'])
+                dest = '%s/%s/%s/' % (cfg['GENERAL']['WorkDir'],
+                                      cfg[sim]['SimName'],
+                                      cfg['NEMO']['NetCDFPath'])
+                sh.mkdir('-p', dest)
                 sh.mdss('-P', cfg[sim]['MdssProject'], 'get', origin, dest)
         if args.wrf:
             print('Downloading WRF outputs (year %s)' % year)
@@ -56,4 +58,9 @@ for sim in simulations:
                       % (cfg[sim]['MdssPath'], year, cfg['WRF']['Prefix'],
                          domain, year)
                       )
-            dest = '%s/%s' % (cfg['GENERAL']['WorkDir'], cfg[sim]['SimName'])
+            dest = '%s/%s/%s/' % (cfg['GENERAL']['WorkDir'],
+                                  cfg[sim]['SimName'],
+                                  cfg['WRF']['NetCDFPath'])
+            sh.mkdir('-p', dest)
+            sh.mdss('-P', cfg[sim]['MdssProject'], 'get', origin, dest)
+
