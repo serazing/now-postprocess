@@ -10,6 +10,7 @@
 import sh
 import argparse
 import nowpp.io as io
+import sys
 
 description = ("Download NOW outputs from the MDSS storage using a configuration file ")
 
@@ -22,17 +23,37 @@ parser.add_argument('--wrf', required=False, default=False,
 args = parser.parse_args()
 
 # Read NOW configuration as a global variable
-cfg = io.read_config(args.config_file)
+cfg = io.read_config_file(args.config_file)
+ystart = cfg['GENERAL']['YearStart']
+ystop = cfg['GENERAL']['YearStop']
+simulations = io.get_simulations(cfg)
 
-for sim in simulation:
-  for year in range(cfg['GENERAL']['YearStart'], cfg['GENERAL']['YearStop'] + 1):  
-    if args.nemo: 
-      for grid in ['T', 'U', 'V']:
-        origin = '%s/%s/%s_%s_*_*_grid_%s_%s.nc' % (cfg[sim]['MdssPath'], 
-                                                    year, cfg[sim]['Prefix'], 
-                                                    cfg['NEMO']['Frequency'], grid,
-                                                    cfg['NEMO']['Dimensions'])
-        dest = '%s/%s' % (cfg['GENERAL']['WorkDir'], cfg[sim]['SimName']) 
-        sh.mdss('-P', cfg[sim]['MdssProject'], 'get', origin, dest)
-    if args.wrf:
-      pass
+# TODO: Hard-coded variables to include in configuration file
+domain = 1
+nemo_grids = ['T', 'U', 'V']
+
+if (not args.nemo) and (not args.wrf):
+    print("You must select at least NEMO or WRF outputs to download")
+    sys.exit(1)
+
+for sim in simulations:
+    for year in range(ystart, ystop + 1):
+        if args.nemo:
+            for grid in nemo_grids:
+                print('Downloading NEMO outputs (grid %s, year %s)'
+                      % (grid, year))
+                origin = ('%s/%s/%s_%s_*_*_grid_%s_%s.nc'
+                          % (cfg[sim]['MdssPath'], year, cfg[sim]['Prefix'],
+                             cfg['NEMO']['Frequency'], grid,
+                             cfg['NEMO']['Dimensions'])
+                          )
+                dest = '%s/%s' % (cfg['GENERAL']['WorkDir'],
+                                  cfg[sim]['SimName'])
+                sh.mdss('-P', cfg[sim]['MdssProject'], 'get', origin, dest)
+        if args.wrf:
+            print('Downloading WRF outputs (year %s)' % year)
+            origin = ('%s/%s/%s_d%02i_%s-??-??_00:00:00'
+                      % (cfg[sim]['MdssPath'], year, cfg['WRF']['Prefix'],
+                         domain, year)
+                      )
+            dest = '%s/%s' % (cfg['GENERAL']['WorkDir'], cfg[sim]['SimName'])

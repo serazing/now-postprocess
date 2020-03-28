@@ -12,6 +12,10 @@ def read_config_file(config_file):
     return cfg
 
 
+def get_simulations(config_file):
+    return _check_simulations(config_file, None)
+
+
 def _check_simulations(config_file, simulations):
     cfg = read_config_file(config_file)
     if simulations is None:
