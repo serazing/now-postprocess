@@ -212,7 +212,7 @@ def open_nemo_griddata_from_netcdf(config_file, simulations=None,
         filenames = get_nemo_filenames_from_config(config_file, sim, grid=grid)
         gdata = xr.open_mfdataset(filenames, **kwargs)
         # Rename time_counter
-        gdata = gdata.rename({'time_average_1d': 'time_counter'})
+        gdata = gdata.set_index(time_counter='time_average_1d')
         # Rename depth coordinates if 3D fields
         if nemo_dim == '3D':
             gdata = gdata.rename({depth_dims[grid]: 'z'})
@@ -392,8 +392,8 @@ def netcdf_to_zarr(config_file, simulations=None,
         if nemo:
             for grid in nemo_grids:
                 griddata = open_nemo_griddata_from_netcdf(config_file, simulations=sim,
-                                                          grid=grid, parallel=True,
-                                                          chunks={'time_counter': 1})
+                                                          grid=grid, parallel=True)
+                                                          #chunks={'time_counter': 1})
                 if variables is not None:
                     griddata = griddata[variables]
                 zarr_path = get_nemo_zarr_folder_from_config(config_file, sim, grid=grid)

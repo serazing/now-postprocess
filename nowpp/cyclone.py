@@ -21,7 +21,6 @@ def get_cyclone_properties(cyclone_tracking):
     lat = get_attribute(6) #LAT_CEN
     lon = get_attribute(7) #LON_CEN
     size = get_attribute(32) #SIZE_MEAN
-    pressure_gradient = get_attribute(17) #PG_300
     pressure = get_attribute(8) #P_CEN
     laplacian = get_attribute(40) #LAP_MEAN
     size = get_attribute(32) #SIZE_MEAN
@@ -31,17 +30,22 @@ def get_cyclone_properties(cyclone_tracking):
     hour = get_attribute(5) # HOUR
     dt = float(cyclone_tracking.temporal_scale_hours)
     duration = get_attribute(25).isel(TimeSteps=0) * dt
+    
+    cyclone_km = xr.IndexVariable('distance', [50, 100, 150, 200, 300, 400, 500, 600])
+    index_attributes = range(13, 21)
+    pressure_gradient = xr.concat([get_attribute(ind) for ind in index_attributes],
+                                  dim=cyclone_km)  #PG_300
     # Create a Dataset gathering the different variable
     cyclone_data = xr.Dataset({'lat': lat, 'lon': lon,
-                           'pressure_gradient': pressure_gradient,
-                           'pressure': pressure,
-                           'laplacian': laplacian,
-                           'size': size,
-                           'duration': duration,
-                           'year': year,
-                           'month': month,
-                           'day': day,
-                           'hour': hour})
+                               'pressure_gradient': pressure_gradient,
+                               'pressure': pressure,
+                               'laplacian': laplacian,
+                               'size': size,
+                               'duration': duration,
+                               'year': year,
+                               'month': month,
+                               'day': day,
+                               'hour': hour})
     cyclone_data.attrs['dt'] = dt
     # Cleaning data and renaming dimensions and
     cyclone_data = cyclone_data.where((np.abs(lat) < 90) &
@@ -84,7 +88,10 @@ def assign_cyclone_trajectory(cyclone_data, dim='time'):
 
 
 def assign_time_and_location(cyclone_data, wrf_grid):
-    ecl_location = cyclone_data.stack(disk=('event', 'time')).dropna('disk')
+    ecl_location = (cyclone_data.drop_dims('distance')
+                                .stack(disk=('event', 'time'))
+                                .dropna('disk')
+                   )
     i_centre, j_centre = wrf.ll_to_xy(wrf_grid,
                                       ecl_location['lat'],
                                       ecl_location['lon'], meta=False)
@@ -100,7 +107,10 @@ def assign_time_and_location(cyclone_data, wrf_grid):
                                                              coords=coords),
                                               date=xr.DataArray(datetime,
                                                                 coords=coords))
-    return ecl_location.unstack('disk')
+    res = (ecl_location.unstack('disk')
+                      .assign({'pressure_gradient': cyclone_data['pressure_gradient']})
+          )
+    return res
 
 
 def match_cyclone_events(cyclone_test, cyclone_ref, delta_hours = 24., delta_x = 600):
