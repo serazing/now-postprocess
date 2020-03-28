@@ -15,22 +15,35 @@ import sys
 description = ("Download NOW outputs from the MDSS storage using a configuration file ")
 
 parser = argparse.ArgumentParser(description=description)
-parser.add_argument('config_file', nargs='?', help='Configuration file')
-parser.add_argument('--nemo', required=False,
-                    default=False, help='Download NEMO files')
-parser.add_argument('--wrf', required=False, default=False,
+parser.add_argument('config_file', nargs=1, help='Configuration file')
+parser.add_argument('--nemo', action='store_true',
+                    help='Download NEMO files')
+parser.add_argument('--wrf', action='store_true',
                     help='Download WRF files')
+parser.add_argument('--ystart', type=int,
+                    help='Manually define the first year')
+parser.add_argument('--ystop', type=int,
+                    help='Manually define the last year')
 args = parser.parse_args()
 
 # Read NOW configuration as a global variable
 cfg = io.read_config_file(args.config_file)
-ystart = cfg['GENERAL']['YearStart']
-ystop = cfg['GENERAL']['YearStop']
-simulations = io.get_simulations(cfg)
+simulations = io.get_simulations(args.config_file)
+if args.ystart is None:
+    ystart = int(cfg['GENERAL']['YearStart'])
+else:
+    ystart = args.ystart
+if args.ystop is None:
+    ystop = int(cfg['GENERAL']['YearStop'])
+else:
+    ystop = args.ystop
 
 # TODO: Hard-coded variables to include in configuration file
 domain = 1
 nemo_grids = ['T', 'U', 'V']
+
+print(ystart, ystop)
+print(simulations)
 
 if (not args.nemo) and (not args.wrf):
     print("You must select at least NEMO or WRF outputs to download")
@@ -40,10 +53,10 @@ for sim in simulations:
     for year in range(ystart, ystop + 1):
         if args.nemo:
             for grid in nemo_grids:
-                print('Downloading NEMO outputs (grid %s, year %s)'
-                      % (grid, year))
+                print('Downloading NEMO outputs (%s,grid %s, year %s)'
+                      % (sim, grid, year))
                 origin = ('%s/%s/%s_%s_*_*_grid_%s_%s.nc'
-                          % (cfg[sim]['MdssPath'], year, cfg[sim]['Prefix'],
+                          % (cfg[sim]['MdssPath'], year, cfg[sim]['NemoPrefix'],
                              cfg['NEMO']['Frequency'], grid,
                              cfg['NEMO']['Dimensions'])
                           )
@@ -53,7 +66,7 @@ for sim in simulations:
                 sh.mkdir('-p', dest)
                 sh.mdss('-P', cfg[sim]['MdssProject'], 'get', origin, dest)
         if args.wrf:
-            print('Downloading WRF outputs (year %s)' % year)
+            print('Downloading WRF outputs (%s, year %s)' % (sim, year))
             origin = ('%s/%s/%s_d%02i_%s-??-??_00:00:00'
                       % (cfg[sim]['MdssPath'], year, cfg['WRF']['Prefix'],
                          domain, year)

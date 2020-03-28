@@ -6,8 +6,9 @@ import pandas as pd
 # Config file sectopm
 #------------------------------------------------------------
 def read_config_file(config_file):
+    import configparser
     from configparser import ConfigParser
-    cfg = ConfigParser()
+    cfg = ConfigParser(interpolation=configparser.ExtendedInterpolation())
     cfg.read(config_file)
     return cfg
 
