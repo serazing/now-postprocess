@@ -1,0 +1,38 @@
+#!/usr/bin/env python
+
+#PBS -N mdss_get
+#PBS -P e14
+#PBS -q copyq
+#PBS -l walltime=10:00:00,mem=4GB,other=mdss
+#PBS -l storage=scratch/e14+gdata/e14
+#PBS -l wd
+
+import sh
+import argparse
+import nowpp.io as io
+
+description = ("Download NOW outputs from the MDSS storage using a configuration file ")
+
+parser = argparse.ArgumentParser(description=description)
+parser.add_argument('config_file', nargs='?', help='Configuration file')
+parser.add_argument('--nemo', required=False,
+                    default=False, help='Download NEMO files')
+parser.add_argument('--wrf', required=False, default=False,
+                    help='Download WRF files')
+args = parser.parse_args()
+
+# Read NOW configuration as a global variable
+cfg = io.read_config(args.config_file)
+
+for sim in simulation:
+  for year in range(cfg['GENERAL']['YearStart'], cfg['GENERAL']['YearStop'] + 1):  
+    if args.nemo: 
+      for grid in ['T', 'U', 'V']:
+        origin = '%s/%s/%s_%s_*_*_grid_%s_%s.nc' % (cfg[sim]['MdssPath'], 
+                                                    year, cfg[sim]['Prefix'], 
+                                                    cfg['NEMO']['Frequency'], grid,
+                                                    cfg['NEMO']['Dimensions'])
+        dest = '%s/%s' % (cfg['GENERAL']['WorkDir'], cfg[sim]['SimName']) 
+        sh.mdss('-P', cfg[sim]['MdssProject'], 'get', origin, dest)
+    if args.wrf:
+      pass
