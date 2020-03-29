@@ -152,9 +152,10 @@ def get_nemo_zarr_folder_from_config(config_file, simulation, grid='U'):
         nemo_freq = cfg['NEMO']['Frequency']
     except KeyError:
         nemo_freq = '*'
-    main_path = cfg[simulation]['Path']
+    main_path = '%s/%s/' % (cfg['GENERAL']['WorkDir'],
+                            cfg[simulation]['SimName'])
     try:
-        prefix = cfg[simulation]['Prefix']  
+        prefix = cfg[simulation]['NemoPrefix']  
     except KeyError:
             prefix = '*'
     name = '%s_%s_%s_%s_grid_%s_%s.zarr'%(prefix, nemo_freq,
