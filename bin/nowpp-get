@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-#PBS -N mdss_get
+#PBS -N nowpp-get
 #PBS -P e14
 #PBS -q copyq
 #PBS -l walltime=10:00:00,mem=4GB,other=mdss
