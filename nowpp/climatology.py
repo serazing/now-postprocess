@@ -17,29 +17,22 @@ def loop_over_dataset(config_file, **options):
                 which = options['which']
             else:
                 which = 'nemo'
-            if 'nemo_grids' in options:
-                nemo_grids = options['nemo_grids']
+            if 'grid' in options:
+                grids = options['grids']
             else:
-                nemo_grids = ['T']
+                grids = ['T']
             if 'save_engine' in options:
                 save_engine = options['save_engine']
             else:
                 save_engine='netcdf'
             # Loop over simulations
             for sim in simulations:
-                if which == 'nemo':
-                    for grid in nemo_grids:
-                        print("Applying %s on NEMO outputs (%s, grid %s)" % (func.__name__, sim, grid))
-                        griddata = io.open_nemo_griddata_from_zarr(config_file, grid=grid, simulations=[sim])
-                        res = func(griddata, **kwargs)
-                        if
-                        io.save_to()
-                        filename = cfg['GENERAL']['WorkDir'] + cfg[sim]['SimName'] + '/' + cfg['NEMO']['ClimatoPath'] + output_name + '.nc'
-                        res.to_netcdf(filename)
-                elif which == 'wrf':
-                    raise NotImplementedError
-                else:
-                    raise ValueError
+                for grid in nemo_grids:
+                    db.cursor.set(simulation=sim, which=which, grid=grid)
+                    print("Applying %s on %s outputs (%s, grid %s)" % (func.__name__, which, sim, grid))
+                    gdata = db.cursor.read()
+                    res = func(griddata, **kwargs)
+                    db.cursor.set(where='climatology')
         return call
     return decorator
 

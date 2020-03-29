@@ -102,10 +102,6 @@ class Cursor:
         self.set_path()
         self.set_basename()
 
-    def set_nemo_grid(self):
-        self.nemo_mask = get_nemo_mask(config_file, grid=grid)
-        self.nemo_grid =
-
     def set_path(self):
         self.path = '%s/%s/%s/' % (self.cfg['GENERAL']['WorkDir'],
                                    self.cfg[self.simulation]['SimName'],
@@ -139,16 +135,18 @@ class Cursor:
     def set(self, **kwargs):
         if 'which' in kwargs:
             self.which = kwargs['which']
-        if 'simulation' in kwargs['which']:
+        if 'simulation' in kwargs:
             self.simulation = kwargs['simulation']
-        if 'grid' in kwargs['grid']:
+        if 'grid' in kwargs:
             self.grid = kwargs['grid']
-        if 'ystart' in kwargs['ystart']:
+        if 'ystart' in kwargs:
             self.ystart = kwargs['ystart']
-        if 'ystop' in kwargs['ystop']:
+        if 'ystop' in kwargs:
             self.ystop = kwargs['ystop']
-        if 'where' in kwargs['where']:
+        if 'where' in kwargs:
             self.where = kwargs['where']
+        self.set_path()
+        self.set_basename()
 
     def read(self, **kwargs):
         if self.where == 'raw':
@@ -161,11 +159,11 @@ class Cursor:
                 gdata = gdata.sel(time_counter=slice(self.ystart, self.ystop))
                 gdata = gdata.where(self.nemo_mask == 1)
             elif self.which == 'wrf':
-                pass
+                raise NotImplementedError
         elif self.where == 'tmp':
             gdata = xr.open_zarr(self.path + self.basename + '.zarr', **kwargs)
         elif self.where == 'climatology':
-            pass
+            raise NotImplementedError
         return gdata
 
     def write(self, gdata, analysis='analysis', where=None, overwrite=False):
@@ -477,28 +475,3 @@ def open_postprocess(config_file, name, chunks=None):
 	except IOError:
 		griddata = xr.open_zarr(postprocess_path + name).chunk(chunks)
 	return griddata
-
-
-def save_to(config_file, griddata, analysis,
-            where='climatology', which='nemo', engine='netcdf'):
-    sim = griddata.simulation.data
-    cfg = read_config_file(config_file)
-    path = '%s/%s/' % (cfg['GENERAL']['WorkDir'], cfg[sim]['SimName'])
-
-    if which == 'nemo':
-        path += cfg['NEMO']['ClimatoPath']
-    elif which == 'wrf':
-    #+ cfg['NEMO']['ClimatoPath'] + output_name + '.nc'
-    if engine == 'netcdf':
-
-    elif engine == 'zarr':
-        griddata.to_zarr()
-
-
-
-
-
-
-#def use_config(config_file):
-#    def decorator(func):
-#        def call (**args, **kwargs):
