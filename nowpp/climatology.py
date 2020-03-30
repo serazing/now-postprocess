@@ -1,7 +1,5 @@
 from . import io
 import xarray as xr
-from functools import wraps
-
 
 def loop_over_dataset(config_file, **options):
     def decorator(func):
@@ -13,11 +11,11 @@ def loop_over_dataset(config_file, **options):
                 simulations = io._check_simulations(config_file, options['simulations'])
             else:
                 simulations = io.get_simulations(config_file)
-            if 'which' in options:
-                which = options['which']
+            if 'model' in options:
+                model = options['model']
             else:
-                which = 'nemo'
-            if 'grid' in options:
+                model = 'nemo'
+            if 'grids' in options:
                 grids = options['grids']
             else:
                 grids = ['T']
@@ -27,9 +25,9 @@ def loop_over_dataset(config_file, **options):
                 save_engine='netcdf'
             # Loop over simulations
             for sim in simulations:
-                for grid in nemo_grids:
-                    db.cursor.set(simulation=sim, which=which, grid=grid)
-                    print("Applying %s on %s outputs (%s, grid %s)" % (func.__name__, which, sim, grid))
+                for grid in grids:
+                    db.cursor.set(simulation=sim, model=model, grid=grid)
+                    print("Applying %s on %s outputs (%s, grid %s)" % (func.__name__, model, sim, grid))
                     gdata = db.cursor.read()
                     res = func(griddata, **kwargs)
                     db.cursor.set(where='climatology')
@@ -37,12 +35,6 @@ def loop_over_dataset(config_file, **options):
     return decorator
 
 
-
-
-
-
-config_file
-def super_wrapper()
 
 
 def open(config_file):
