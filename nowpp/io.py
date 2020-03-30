@@ -124,8 +124,8 @@ class Cursor:
         self.grid = grid
         self.where = where
         self.nemo_mask = get_nemo_mask(config_file, grid=self.grid)
-        self.nemo_grid = get_nemo_meshgrid(config_file, grid=self.grid)
-        self.wrf_grid = get_wrf_meshgrid(config_file)
+        #self.nemo_grid = get_nemo_meshgrid(config_file, grid=self.grid)
+        #self.wrf_grid = get_wrf_meshgrid(config_file)
         self.set_path()
         self.set_basename()
 
@@ -180,10 +180,10 @@ class Cursor:
             if self.model == 'nemo':
                 new_dims = NEMO_NEW_DIMS[self.grid]
                 new_coords = NEMO_NEW_COORDS[self.grid]
-                sim_coord = xr.DataArray([self.sim, ], dims='simulation')
+                sim_coord = xr.DataArray([self.simulation, ], dims='simulation')
                 if self.cfg['NEMO']['Dimensions'] == '2D':
-                    del(new_dims['z'])
-                    del(new_coords['z'])
+                    new_dims = {dim: new_dims[dim] for dim in new_dims if dim != 'z'}
+                    new_coords = {coord: new_coords[coord] for coord in new_coords if coord != 'depth'}
                 gdata = xr.open_mfdataset(self.path + self.basename, **kwargs)
                 gdata = (gdata.set_index(time_counter='time_average_1d')
                               .rename_dims({'time_counter': 'time'})
