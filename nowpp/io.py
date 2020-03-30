@@ -221,13 +221,15 @@ class Cursor:
 
         return gdata
 
-    def write(self, gdata, analysis='analysis', where=None, overwrite=False):
+    def write(self, gdata, extension='', where=None, 
+            overwrite=False, chunks={'time': 300}, **kwargs):
         if where is None:
             where = self.where
         if where == 'raw':
             raise ValueError('Cannot write in the raw directory')
         elif where == 'tmp':
-            gdata.to_zarr(self.path + self.basename + '_%s.zarr' % analysis)
+            gdata = gdata.chunk(chunks)
+            gdata.to_zarr(self.path + self.basename + '_%s.zarr' % extension, **kwargs)
         elif where == 'climatology':
             if self.model == 'nemo':
                 filename = self.cfg['NemoPrefix']
@@ -263,9 +265,10 @@ class DataBase:
             else:
                 gdata = self.cs.read(**kwargs)
             list_of_gdata.append(gdata)
-        return xr.concat(list_of_gdata, dim='simulaition')
+        return xr.concat(list_of_gdata, dim='simulation')
 
     def netcdf_to_zarr(self, simulations=None, grids=['T'], model='nemo',
+                       chunks={'time': 300},
                        read_kwargs={}, write_kwargs={}):
         if simulations is None:
             simulations = self.simulations
@@ -287,7 +290,7 @@ class DataBase:
                              for var in gdata.variables
                         }
             self.cs.set(where='tmp')
-            self.cs.write(gdata, encoding=encoding, **write_kwargs)
+            self.cs.write(gdata, chunks=chunks, encoding=encoding, **write_kwargs)
 
 
 def _rename_wrfout_plev_variables(griddata, 
