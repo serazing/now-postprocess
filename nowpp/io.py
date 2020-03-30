@@ -157,7 +157,7 @@ class Cursor:
         self._update_basename()
         self.nemo_mask = get_nemo_mask(self.config_file, grid=self.grid)
 
-    def read(self, **kwargs):
+    def read(self,  extension='', engine='zarr', **kwargs):
         if self.where == 'raw':
 
             # Case for opening raw NEMO outputs
@@ -196,28 +196,27 @@ class Cursor:
                                             XLONG=self.wrf_grid.XLONG_M,
                                             LANDMASK=self.wrf_grid.LANDMASK)
 
-        elif self.where == 'tmp':
-            # Case for opening raw NEMO outputs
-            gdata = xr.open_zarr(self.path + self.basename + '.zarr', **kwargs)
-        elif self.where == 'climatology':
-            raise NotImplementedError
+        else:
+            if engine == 'zarr':
+                gdata = xr.open_zarr(self.path + self.basename + '%s.zarr' %
+                                     extension, **kwargs)
 
         return gdata
 
-    def write(self, gdata, extension='', where=None, chunks={'time': 300},
+    def write(self, gdata, extension='', where=None, chunks=None,
               engine='zarr', **kwargs):
         gdata = gdata.chunk(chunks)
         if where is None:
             where = self.where
-        if where == 'raw':
+        elif where == 'raw':
             raise ValueError('Cannot write in the raw directory')
-        else:
-            if engine == 'zarr':
-                gdata.to_zarr(self.path + self.basename + '%s.zarr' %
-                              extension, **kwargs)
-            elif engine == 'netcdf':
-                gdata.to_netcdf(self.path + self.basename + '%s.nc' %
-                                extension, **kwargs)
+        self.sel(where=where)
+        if engine == 'zarr':
+            gdata.to_zarr(self.path + self.basename + '%s.zarr' % extension,
+                          **kwargs)
+        elif engine == 'netcdf':
+            gdata.to_netcdf(self.path + self.basename + '%s.nc' % extension,
+                            **kwargs)
 
 
 class DataBase:
