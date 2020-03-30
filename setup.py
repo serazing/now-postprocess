@@ -6,7 +6,7 @@ from setuptools import setup
 DISTNAME = 'now-postprocess'
 PACKAGES = ['nowpp']
 TESTS = [p + '.tests' for p in PACKAGES]
-INSTALL_REQUIRES = ['numpy >= 1.11', 'matplotlib>=1.5']
+INSTALL_REQUIRES = ['xarray', 'numpy >= 1.11', 'matplotlib>=1.5']
 TESTS_REQUIRE = ['pytest >= 2.7.1']
 URL = ''
 AUTHOR = 'Guillaume Serazin'

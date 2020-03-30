@@ -26,11 +26,11 @@ def loop_over_dataset(config_file, **options):
             # Loop over simulations
             for sim in simulations:
                 for grid in grids:
-                    db.cursor.set(simulation=sim, model=model, grid=grid)
+                    db.cursor.sel(simulation=sim, model=model, grid=grid)
                     print("Applying %s on %s outputs (%s, grid %s)" % (func.__name__, model, sim, grid))
                     gdata = db.cursor.read()
                     res = func(griddata, **kwargs)
-                    db.cursor.set(where='climatology')
+                    db.cursor.sel(where='climatology')
         return call
     return decorator
 

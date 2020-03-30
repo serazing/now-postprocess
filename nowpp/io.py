@@ -1,6 +1,6 @@
 import xarray as xr
 import os
-from oocgcm.oceanmodels.nemo import grids
+#from oocgcm.oceanmodels.nemo import grids
 import pandas as pd
 
 
@@ -42,14 +42,6 @@ def get_simulations(config_file):
     return _check_simulations(config_file, None)
 
 
-def get_nemo_grid_from_config(config_file):
-    cfg = read_config_file(config_file)
-    nemo_grid = grids.nemo_2d_grid(
-        nemo_coordinate_file=cfg['NEMO']['MeshGridFile'],
-        nemo_byte_mask_file=cfg['NEMO']['MaskFile'])
-    return nemo_grid
-
-
 def get_nemo_mask(config_file, grid='U'):
     cfg = read_config_file(config_file)
     mask_file = cfg['NEMO']['MaskFile']
@@ -66,7 +58,7 @@ def get_nemo_mask(config_file, grid='U'):
     return mask
 
 
-def get_nemo_meshgrid(config_file, grid='U'):
+def get_nemo_meshgrid(config_file):
     cfg = read_config_file(config_file)
     meshgrid_file = cfg['NEMO']['MeshGridFile']
     dims = cfg['NEMO']['Dimensions']
@@ -78,18 +70,9 @@ def get_nemo_meshgrid(config_file, grid='U'):
         meshgrid = meshgrid.assign_coords(coords).rename_dims(NEMO_NEW_DIMS[grid])
         list_of_meshgrid.append(meshgrid)
     new_meshgrid = xr.merge(meshgrid)
-
     if dims == '2D':
-        meshgrid = meshgrid.isel(z_c=0)
-    return meshgrid
-
-
-def get_wrf_meshgrid(config_file):
-    cfg = read_config_file(config_file)
-    meshgrid_file = cfg['WRF']['MeshGridFile']
-    meshgrid = xr.open_dataset(meshgrid_file).squeeze()
-    return meshgrid
-
+        new_meshgrid = new_meshgrid.isel(z_c=0, z_r=0)
+    return new_meshgrid
 
 def _check_simulations(config_file, simulations):
     cfg = read_config_file(config_file)
@@ -126,15 +109,15 @@ class Cursor:
         self.nemo_mask = get_nemo_mask(config_file, grid=self.grid)
         #self.nemo_grid = get_nemo_meshgrid(config_file, grid=self.grid)
         #self.wrf_grid = get_wrf_meshgrid(config_file)
-        self.set_path()
-        self.set_basename()
+        self._update_path()
+        self._update_basename()
 
-    def set_path(self):
+    def _update_path(self):
         self.path = '%s/%s/%s/' % (self.cfg['GENERAL']['WorkDir'],
                                    self.cfg[self.simulation]['SimName'],
                                    self.cfg[OA_DICT[self.model]][PATH_DICT[self.where]])
 
-    def set_basename(self):
+    def _update_basename(self):
         if self.model == 'nemo':
             prefix = self.cfg[self.simulation]['NemoPrefix']
             freq = self.cfg['NEMO']['Frequency']
@@ -157,7 +140,7 @@ class Cursor:
                 self.basename = '%s_d%02i_%s-%s' % (prefix, domain,
                                                     self.ystart, self.ystop,)
 
-    def set(self, **kwargs):
+    def sel(self, **kwargs):
         if 'model' in kwargs:
             self.model = kwargs['model']
         if 'simulation' in kwargs:
@@ -170,8 +153,8 @@ class Cursor:
             self.ystop = kwargs['ystop']
         if 'where' in kwargs:
             self.where = kwargs['where']
-        self.set_path()
-        self.set_basename()
+        self._update_path()
+        self._update_basename()
         self.nemo_mask = get_nemo_mask(self.config_file, grid=self.grid)
 
     def read(self, **kwargs):
@@ -221,20 +204,20 @@ class Cursor:
 
         return gdata
 
-    def write(self, gdata, extension='', where=None, 
-            overwrite=False, chunks={'time': 300}, **kwargs):
+    def write(self, gdata, extension='', where=None, chunks={'time': 300},
+              engine='zarr', **kwargs):
+        gdata = gdata.chunk(chunks)
         if where is None:
             where = self.where
         if where == 'raw':
             raise ValueError('Cannot write in the raw directory')
-        elif where == 'tmp':
-            gdata = gdata.chunk(chunks)
-            gdata.to_zarr(self.path + self.basename + '_%s.zarr' % extension, **kwargs)
-        elif where == 'climatology':
-            if self.model == 'nemo':
-                filename = self.cfg['NemoPrefix']
-            elif self.model == 'wrf':
-                pass
+        else:
+            if engine == 'zarr':
+                gdata.to_zarr(self.path + self.basename + '%s.zarr' %
+                              extension, **kwargs)
+            elif engine == 'netcdf':
+                gdata.to_netcdf(self.path + self.basename + '%s.nc' %
+                                extension, **kwargs)
 
 
 class DataBase:
@@ -245,12 +228,14 @@ class DataBase:
         self.cs = Cursor(config_file)
         self.simulations = get_simulations(config_file)
         self.grids = ['U', 'V', 'T', 'W']
+        self.models = ['NEMO', 'WRF']
+        self.xgrids = None
 
 
     def _combine_grids(self, grids,  **kwargs):
         list_of_gdata = []
         for grid in grids:
-            self.cs.set(grid=grid)
+            self.cs.sel(grid=grid)
             gdata_grid = self.cs.read(**kwargs)
             list_of_gdata.append(gdata_grid)
         gdata = xr.merge(list_of_gdata)
@@ -259,7 +244,7 @@ class DataBase:
     def open(self, simulations=None, grids=None, model='nemo', where='raw',  **kwargs):
         list_of_gdata = []
         for sim in simulations:
-            self.cs.set(model=model, simulation=sim, where=where)
+            self.cs.sel(model=model, simulation=sim, where=where)
             if model == 'nemo' and where == 'raw':
                 gdata = self._combine_grids(grids, **kwargs)
             else:
@@ -279,9 +264,9 @@ class DataBase:
         if 'compressor' not in write_kwargs:
             from zarr import Blosc                                            
             compressor = Blosc(cname='zstd', clevel=3, shuffle=0)
-        self.cs.set(model=model)
+        self.cs.sel(model=model)
         for sim in simulations:
-            self.cs.set(model=model, simulation=sim, where='raw')
+            self.cs.sel(model=model, simulation=sim, where='raw')
             if model == 'nemo':
                 gdata = self._combine_grids(grids, **read_kwargs)
             else:
@@ -289,25 +274,58 @@ class DataBase:
             encoding = {var: {'compressor': compressor}
                              for var in gdata.variables
                         }
-            self.cs.set(where='tmp')
+            self.cs.sel(where='tmp')
             self.cs.write(gdata, chunks=chunks, encoding=encoding, **write_kwargs)
 
+    def apply(self, func, simulations=None, model=None):
+        apply_to_database(self, simulations=simulations, model=model)(func)
 
-def _rename_wrfout_plev_variables(griddata, 
-                                  list_of_variables=['U', 'V', 'W', 
-                                                     'T', 'Vort', 'MoCo', 
-                                                     'The', 'RH']):
-    for var_origin in griddata.variables:
-        for var in list_of_variables:
-            if '%s_'%var in var_origin:
-                griddata.rename({var_origin: var}, inplace=True)
+    def get_model_xgrid(self, model=None):
+        """
+        Return the XGCM grid operator for computing on the gridded dataset
+
+        Parameters
+        ----------
+        model : basestring
+            The model for which the grid is needed
+
+        Returns
+        -------
+        xgrid  : xgcm.Grid
+            The XGCM grid object for performing computation on the grid
+        """
+        if model is None:
+            model = self.model[0]
+        xgrid = self.xgrids[model]
+        return xgrid
 
 
-def to_postprocess(griddata, config_file, output_name, type='netcdf'):
-    cfg = read_config_file(config_file)
-    postprocess_path = cfg['GENERAL']['PostProcessPath']
-    if type == 'netcdf':
-        griddata.to_netcdf(postprocess_path + output_name)
-    elif type == 'zarr':
-        griddata.to_zarr(postprocess_path + output_name)
-
+def apply_to_database(db, **options):
+    def decorator(func):
+        def call(*args, **kwargs):
+            output_name = 'analysis'
+            # Checking kwargs
+            if 'simulations' in options:
+                simulations = options['simulations']
+            else:
+                simulations = db.simulations
+            if 'model' in options:
+                model = options['model']
+            else:
+                model = db.model
+            if 'save_engine' in options:
+                save_engine = options['save_engine']
+            else:
+                save_engine = 'netcdf'
+            # Loop over simulations
+            for sim in simulations:
+                db.cursor.sel(simulation=sim, model=model,
+                              where='tmp', grid=grid)
+                print("Applying %s on %s outputs (%s)" % (func.__name__, model, sim))
+                gdata = db.cursor.read()
+                res = func(gdata, **kwargs)
+                db.cursor.sel(where='climatology')
+                db.cursor.write(res, engine=save_engine,
+                                extension=func.__name__)
+        return call
+    return decorator
