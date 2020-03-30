@@ -2,6 +2,31 @@ import xarray as xr
 import os
 from oocgcm.oceanmodels.nemo import grids
 import pandas as pd
+
+
+NEMO_NEW_DIMS = {'T': {'x': 'x_c', 'y': 'y_c', 'z': 'z_c'},
+                 'U': {'x': 'x_r', 'y': 'y_c', 'z': 'z_c'},
+                 'V': {'x': 'x_c', 'y': 'y_r', 'z': 'z_c'},
+                 'F': {'x': 'x_r', 'y': 'y_r', 'z': 'z_c'},
+                 'W': {'x': 'x_c', 'y': 'y_c', 'z': 'z_r'}
+                }
+
+NEMO_NEW_COORDS = {'T': {'nav_lon': 'lon_T', 'nav_lat': 'lat_T', 'depth': 'depth_T'},
+                   'U': {'nav_lon': 'lon_U', 'nav_lat': 'lat_U', 'depth': 'depth_U'},
+                   'V': {'nav_lon': 'lon_V', 'nav_lat': 'lat_V', 'depth': 'depth_V'},
+                   'W': {'nav_lon': 'lon_T', 'nav_lat': 'lat_T', 'depth': 'depth_W'}
+                  }
+
+PATH_DICT = {'raw': 'RawPath',
+             'tmp': 'TmpPath',
+             'climatology': 'ClimPath'}
+
+OA_DICT = {'nemo': 'NEMO',
+           'wrf': 'WRF'}
+
+
+WRF_NEW_DIMENSIONS = {}
+
 #------------------------------------------------------------
 # Config file sectopm
 #------------------------------------------------------------
@@ -45,15 +70,24 @@ def get_nemo_meshgrid(config_file, grid='U'):
     cfg = read_config_file(config_file)
     meshgrid_file = cfg['NEMO']['MeshGridFile']
     dims = cfg['NEMO']['Dimensions']
-    meshgrid = xr.open_dataset(meshgrid_file).squeeze()
-    if grid is 'U':
-        meshgrid = meshgrid[['e1u', 'e2u', 'e3u']]
-    elif grid is 'V':
-        meshgrid = meshgrid[['e1v', 'e2v', 'e3v']]
-    elif grid is 'T':
-        meshgrid = meshgrid[['e1t', 'e2t', 'e3t']]
+    original_meshgrid = xr.open_dataset(meshgrid_file).squeeze()
+    list_of_meshgrid = []
+    for grid in ['U', 'V', 'T', 'F', 'W']:
+        meshgrid = original_meshgrid[list(NEMO_NEW_GRID[grid])].rename(NEMO_NEW_GRID[grid])
+        coords = original_meshgrid[list(NEMO_NEW_COORDS[grid])].rename(NEMO_NEW_COORDS[grid])
+        meshgrid = meshgrid.assign_coords(coords).rename_dims(NEMO_NEW_DIMS[grid])
+        list_of_meshgrid.append(meshgrid)
+    new_meshgrid = xr.merge(meshgrid)
+
     if dims == '2D':
-        meshgrid = meshgrid.isel(z=0)
+        meshgrid = meshgrid.isel(z_c=0)
+    return meshgrid
+
+
+def get_wrf_meshgrid(config_file):
+    cfg = read_config_file(config_file)
+    meshgrid_file = cfg['WRF']['MeshGridFile']
+    meshgrid = xr.open_dataset(meshgrid_file).squeeze()
     return meshgrid
 
 
@@ -67,16 +101,9 @@ def _check_simulations(config_file, simulations):
     return simulations
 
 
-PATH_DICT = {'raw': 'RawPath',
-             'tmp': 'TmpPath',
-             'climatology': 'ClimPath'}
-OA_DICT = {'nemo': 'NEMO',
-           'wrf': 'WRF'}
-
-
 class Cursor:
 
-    def __init__(self, config_file, which='nemo',
+    def __init__(self, config_file, model='nemo',
                  simulation=None, grid='T',
                  ystart=None, ystop=None, where='raw'):
         self.cfg = read_config_file(config_file)
@@ -93,7 +120,7 @@ class Cursor:
             self.ystop = self.cfg['GENERAL']['YearStop']
         else:
             self.ystop = ystop
-        self.which = which
+        self.model = model
         self.grid = grid
         self.where = where
         self.nemo_mask = get_nemo_mask(config_file, grid=self.grid)
@@ -105,23 +132,21 @@ class Cursor:
     def set_path(self):
         self.path = '%s/%s/%s/' % (self.cfg['GENERAL']['WorkDir'],
                                    self.cfg[self.simulation]['SimName'],
-                                   self.cfg[OA_DICT[self.which]][PATH_DICT[self.where]])
+                                   self.cfg[OA_DICT[self.model]][PATH_DICT[self.where]])
 
     def set_basename(self):
-        if self.which == 'nemo':
+        if self.model == 'nemo':
             prefix = self.cfg[self.simulation]['NemoPrefix']
             freq = self.cfg['NEMO']['Frequency']
             dim = self.cfg['NEMO']['Dimensions']
             if self.where == 'raw':
-                self.basename =  '%s_%s_*_*_grid_%s_%s.nc' %(prefix, freq,
+                self.basename =  '%s_%s_*_*_grid_%s_%s.nc' % (prefix, freq,
                                                           self.grid, dim)
             else:
-                self.basename =  '%s_%s_%s_%s_grid_%s_%s' %(prefix, freq,
-                                                            self.ystart,
-                                                            self.ystop,
-                                                            self.grid,
-                                                            dim)
-        elif self.which == 'wrf':
+                self.basename =  '%s_%s_%s_%s_%s' % (prefix, freq,
+                                                     self.ystart, self.ystop,
+                                                     dim)
+        elif self.model == 'wrf':
             prefix = self.cfg['WRF']['Prefix']
             dim = self.cfg['NEMO']['Dimensions']
             domain = 1
@@ -133,8 +158,8 @@ class Cursor:
                                                     self.ystart, self.ystop,)
 
     def set(self, **kwargs):
-        if 'which' in kwargs:
-            self.which = kwargs['which']
+        if 'model' in kwargs:
+            self.model = kwargs['model']
         if 'simulation' in kwargs:
             self.simulation = kwargs['simulation']
         if 'grid' in kwargs:
@@ -150,20 +175,50 @@ class Cursor:
 
     def read(self, **kwargs):
         if self.where == 'raw':
-            if self.which == 'nemo':
-                depth_dims = {'U': 'depthu', 'V': 'depthv', 'T': 'deptht'}
+
+            # Case for opening raw NEMO outputs
+            if self.model == 'nemo':
+                new_dims = NEMO_NEW_DIMS[self.grid]
+                new_coords = NEMO_NEW_COORDS[self.grid]
+                sim_coord = xr.DataArray([self.sim, ], dims='simulation')
+                if self.cfg['NEMO']['Dimensions'] == '2D':
+                    del(new_dims['z'])
+                    del(new_coords['z'])
                 gdata = xr.open_mfdataset(self.path + self.basename, **kwargs)
-                gdata = gdata.set_index(time_counter='time_average_1d')
-                if self.cfg['NEMO']['Dimensions'] == '3D':
-                    gdata = gdata.rename({depth_dims[self.grid]: 'z'})
-                gdata = gdata.sel(time_counter=slice(self.ystart, self.ystop))
-                gdata = gdata.where(self.nemo_mask == 1)
-            elif self.which == 'wrf':
-                raise NotImplementedError
+                gdata = (gdata.set_index(time_counter='time_average_1d')
+                              .rename_dims({'time_counter': 'time'})
+                              .rename_dims(new_dims)
+                              .rename(new_coords)
+                              .sel(time=slice(self.ystart, self.ystop))
+                              .where(self.nemo_mask == 1)
+                              .expand_dims('simulation')
+                              .assign(simulation=sim_coord)
+                         )
+                
+            # Case for opening raw WRF outputs
+            elif self.model == 'wrf':
+                #raise NotImplementedError
+                gdata = xr.open_mfdataset(self.path + self.basename,
+                                          concat_dim='Time',
+                                          decode_coords=False,
+                                          decode_times=False,
+                                          decode_cf=False,
+                                          drop_variables=['XLON', 'XLAT'],
+                                          **kwargs)
+                gdata = xr.decode_cf(gdata)
+                time = pd.to_datetime(gdata.Times.load().astype('str'),
+                                      format='%Y-%m-%d_%H:%M:%S')
+                gdata = gdata.assign_coords(Time=time).rename({'Time': 'time'})
+                gdata = gdata.assign_coords(XLAT=self.wrf_grid.XLAT_M,
+                                            XLONG=self.wrf_grid.XLONG_M,
+                                            LANDMASK=self.wrf_grid.LANDMASK)
+
         elif self.where == 'tmp':
+            # Case for opening raw NEMO outputs
             gdata = xr.open_zarr(self.path + self.basename + '.zarr', **kwargs)
         elif self.where == 'climatology':
             raise NotImplementedError
+
         return gdata
 
     def write(self, gdata, analysis='analysis', where=None, overwrite=False):
@@ -174,278 +229,50 @@ class Cursor:
         elif where == 'tmp':
             gdata.to_zarr(self.path + self.basename + '_%s.zarr' % analysis)
         elif where == 'climatology':
-            if self.which == 'nemo':
+            if self.model == 'nemo':
                 filename = self.cfg['NemoPrefix']
-            elif self.which == 'wrf':
+            elif self.model == 'wrf':
                 pass
 
 
 class DataBase:
 
     def __init__(self, config_file):
-        self.cfg = read_config_file(config_file)
         self.config_file = config_file
-        self.cursor = Cursor(config_file)
+        self.cfg = read_config_file(config_file)
+        self.cs = Cursor(config_file)
+        self.simulations = get_simulations(config_file)
 
-    def open(self, simulations=None, grids=None, which='nemo'):
+    def open(self, simulations=None, model='nemo'):
         list_of_gdata = []
         for sim in simulations:
-            self.cursor.set(simulation=sim)
-            ds = self.cursor.read()
+            self.cs.set(simulation=sim)
+            ds = self.cs.read()
+        return ds
 
-    def netcdf_to_zarr(self, simulations=None, grid=None, which='nemo',
-                       chunks={}):
-        from zarr import Blosc
-        compressor = Blosc(cname='zstd', clevel=3, shuffle=0)
-        simulations = _check_simulations(self.config_file, simulations)
-        self.cursor.set(which=which)
+    def netcdf_to_zarr(self, simulations=None, grids=None, model='nemo',
+                       read_kwargs={}, write_kwargs={}):
+        if simulations is None:
+            simulations = self.simulations
+        else:
+            simulations = _check_simulations(self.config_file, simulations)
+        if grids is None:
+            grids = ['T']
+        if 'compressor' not in write_kwargs:
+            from zarr import Blosc                                            
+            compressor = Blosc(cname='zstd', clevel=3, shuffle=0)
+        self.cs.set(model=model)
         for sim in simulations:
+            list_of_gdata = []
             for grid in grids:
-                self.cursor.set(simulation=sim, grid=grid)
-                gdata = self.cursor.read(parallel=True)
-                encoding = {var: {'compressor': compressor}
-                            for var in gdata.variables}
-                self.cursor.set(where='tmp')
-                self.cursor.write(gdata, encoding=encoding)
-
-def open_nemo_griddata_from_netcdf(simulations=None,
-                                   grid='T', **kwargs):
-    """
-    Get the full path of NEMO filenames from the configuration file
-    for a particular simulation and a particular grid
-    
-    Parameters
-    ----------
-    config_file : str
-        The path of the configuration file
-    simlation : str or list of str
-        Names of simulations to open as written in the configuration file 
-    grid : {'T', 'U', 'V', 'W'}, optional
-        Type of 'C' grid to look for
-    **kwargs : optional
-        Additional arguments passed on to `xarray.open_mfdataset`
-    
-    Returns
-    -------
-    griddata : xarray.Dataset
-        The NEMO outputs represented by a Dataset
-    """
-    depth_dims = {'U': 'depthu', 'V': 'depthv', 'T': 'deptht'}
-    list_of_gdata = []
-    # Get the corresponding mask
-    mask = get_nemo_mask(config_file, grid=grid)
-    for sim in simulations:
-        filenames = get_nemo_filenames_from_config(config_file, sim, grid=grid)
-        print(filenames)
-        gdata = xr.open_mfdataset(filenames, **kwargs)
-        # Rename time_counter
-        gdata = gdata.set_index(time_counter='time_average_1d')
-        # Rename depth coordinates if 3D fields
-        if nemo_dim == '3D':
-            gdata = gdata.rename({depth_dims[grid]: 'z'})
-        # Remove duplicated values
-        #gdata = gdata.sel(time_counter=\
-        #                        ~gdata.indexes['time_counter'].duplicated())
-        # Select a particular time range
-        gdata = gdata.sel(time_counter=slice(year_start, year_stop))
-        # Insure the data is masked
-        gdata = gdata.where(mask == 1)
-        list_of_gdata.append(gdata)
-    griddata = xr.concat(list_of_gdata, dim='simulation')
-    griddata['simulation'] = simulations
-    return griddata
-
-
-def open_nemo_griddata_from_zarr(config_file, simulations=None,
-                                 grid='U', chunks=None):
-    simulations = _check_simulations(config_file, simulations)
-    list_of_griddata = []
-    for sim in simulations:
-        zarr_path = get_nemo_zarr_folder_from_config(config_file, sim, grid=grid)
-        list_of_griddata.append(xr.open_zarr(zarr_path))
-    griddata = xr.concat(list_of_griddata, dim='simulation')
-    griddata['simulation'] = simulations
-    return griddata.chunk(chunks=chunks)
-
-
-# WRF Section
-# ------------------------------------------------------------
-
-def get_wrf_meshgrid(config_file):
-    cfg = read_config_file(config_file)
-    meshgrid_file = cfg['WRF']['MeshGridFile']
-    meshgrid = xr.open_dataset(meshgrid_file).squeeze()
-    return meshgrid
-
-
-def open_wrf_griddata_from_netcdf(config_file, simulations=None,
-                                  prefix='wrfout', domain='d01', 
-                                  variables=None, year=None,
-                                  grid=True, **kwargs):
-    """
-    Open WRF netCDF from the configuration file
-    
-    Parameters
-    ----------
-    config_file : str
-        The path of the configuration file
-    simulation : str or list of str, optional
-        Names of simulations to open as written in the configuration file
-    prefix : str, optional
-        The prefix of WRF output files (usually 'wrfout' or 'wrfhrly'). 
-    domain : str, optional
-        The name of the WRF domain ('d01' is the parent domain by default).
-    variables : list of str, optional
-        A list of variables to read
-    year : int, optional
-        A specific year to read
-    grid : bool, optional
-        If True, metric from the grid file is added to the Dataset
-    **kwargs : optional
-        Additional arguments passed on to `xarray.open_mfdataset`
-    
-    Returns
-    -------
-    griddata : xarray.Dataset
-        The WRF outputs represented by a Dataset
-    """
-    cfg = read_config_file(config_file)
-    if simulations is None:
-        simulations = [key for key in cfg 
-                       if key not in ['DEFAULT', 'GENERAL', 'WRF', 'NEMO'] ]
-    elif not isinstance(simulations, (list, tuple)):
-        simulations = [simulations,]
-    list_of_gdata = []
-    for sim in simulations:        
-        gdata = _open_wrf_griddata_from_netcdf(config_file, 
-                                               sim, 
-                                               prefix=prefix, 
-                                               domain=domain, 
-                                               variables=variables, 
-                                               year=year,
-                                               grid=grid, 
-                                               **kwargs)
-        list_of_gdata.append(gdata)
-    griddata = xr.concat(list_of_gdata, dim='simulation')
-    griddata['simulation'] = simulations
-    return griddata
-
-
-def _open_wrf_griddata_from_netcdf(config_file, simulation,
-                                   prefix='wrfout', domain='d01', 
-                                   variables=None, year=None,
-                                   grid=True, **kwargs):
-    cfg = read_config_file(config_file)
-    main_path = cfg[simulation]['Path']    
-    year_start = cfg['GENERAL']['YearStart']
-    year_stop = cfg['GENERAL']['YearStop']    
-    try:
-        wrf_path = cfg['WRF']['NetCDFPath']
-    except KeyError:
-        wrf_path = './'
-    try:
-        wrf_freq = cfg['WRF']['Frequency']
-    except:
-        wrf_freq = '*'
-    try:
-        wrf_prefix = cfg['WRF']['Prefix']
-    except:
-        wrf_prefix = prefix
-    if year is None:
-        year = '*'
-    filenames = '%s_%s_%s-*' %(wrf_prefix, domain, year)
-    full_filenames = main_path + wrf_path + filenames
-    ds = xr.open_mfdataset(full_filenames, concat_dim='Time',  
-                           decode_coords=False, decode_times=False,
-                           decode_cf=False, 
-                           drop_variables=['XLON', 'XLAT'], 
-                           **kwargs)
-    ds = xr.decode_cf(ds)
-    time = pd.to_datetime(ds.Times.load().astype('str'), format='%Y-%m-%d_%H:%M:%S')
-    ds = ds.assign_coords(Time=time).rename({'Time': 'time'})
-    if variables is not None:
-        ds = ds[variables]
-    if grid:
-        meshgrid = get_wrf_meshgrid(config_file)
-        ds = ds.assign_coords(XLAT=meshgrid.XLAT_M, 
-                              XLONG=meshgrid.XLONG_M, 
-                              LANDMASK=meshgrid.LANDMASK)
-    return ds
-
-
-def _open_wrfout_plev_from_netcdf(config_file, simulation, plev, **kwargs):
-    cfg = read_config_file(config_file)
-    main_path = cfg[simulation]['Path']    
-    year_start = cfg['GENERAL']['YearStart']
-    year_stop = cfg['GENERAL']['YearStop']    
-    try:
-        wrf_path = cfg['WRF']['NetCDFPath']
-    except KeyError:
-        wrf_path = './'
-    try:
-        wrf_freq = cfg['WRF']['Frequency']
-    except:
-        wrf_freq = '*'
-    try:
-        wrf_prefix = cfg['WRF']['Prefix']
-    except:
-        prefix = '*'     
-    list_of_griddata = []  
-    # First level is at the 10 meter high
-    filenames = '%s_%s_%s.nc' %(wrf_prefix, wrf_freq, plev)
-    full_filenames = main_path + wrf_path + filenames
-    griddata_plev = xr.open_mfdataset(full_filenames, 
-                                      concat_dim='Time', 
-                                      **kwargs)
-    griddata_plev = griddata_plev.sel(Time=slice(year_start, year_stop))
-    return griddata_plev
-
-
-def netcdf_to_zarr(config_file, simulations=None,
-                   variables=None,
-                   nemo=True, wrf=True, 
-                   nemo_grids=['U', 'V', 'T'],
-                   nemo_chunks={'time_counter': 300},
-                   wrf_chunks={'time': 300}, 
-                   overwrite=False, compute=True):
-    from zarr import Blosc
-    compressor = Blosc(cname='zstd', clevel=3, shuffle=0)
-    cfg = read_config_file(config_file)
-    simulations = _check_simulations(config_file, simulations)
-    list_of_res = []
-    for sim in simulations:
-        if nemo:
-            for grid in nemo_grids:
-                griddata = open_nemo_griddata_from_netcdf(config_file,
-                                                          simulations=sim,
-                                                          grid=grid,
-                                                          parallel=True)
-                                                          #chunks={'time_counter': 1})
-                if variables is not None:
-                    griddata = griddata[variables]
-                zarr_path = get_nemo_zarr_folder_from_config(config_file,
-                                                             sim, grid=grid)
-                encoding = {var: {'compressor': compressor}
-                            for var in griddata.variables}
-                # Rechunk and save to the zarr format
-                if not os.path.isdir(zarr_path):
-                    res = griddata.chunk(nemo_chunks).to_zarr(zarr_path,
-                                                              mode='w-',
-                                                              encoding=encoding, 
-                                                              compute=compute)
-                elif os.path.isdir(zarr_path) and overwrite:
-                    res = griddata.chunk(nemo_chunks).to_zarr(zarr_path,
-                                                              mode='w',
-                                                              encoding=encoding,
-                                                              compute=compute)
-                else:
-                    print("Skipping the conversion to zarr of grid %s of" 
-                          " simulation %s because the folder aready "
-                          "exits." % (grid, sim))
-                list_of_res.append(res)
-        if wrf:
-            raise NotImplementedError
-    return list_of_res
+                self.cs.set(where='raw', simulation=sim, grid=grid)
+                gdata_grid = self.cs.read(parallel=True, **read_kwargs)
+                list_of_gdata.append(gdata_grid)
+            gdata = xr.merge(list_of_gdata)
+            encoding = {var: {'compressor': compressor}
+                        for var in gdata.variables}
+            self.cs.set(where='tmp')
+            self.cs.write(gdata, encoding=encoding, **write_kwargs)
 
 
 def _rename_wrfout_plev_variables(griddata, 
@@ -457,7 +284,7 @@ def _rename_wrfout_plev_variables(griddata,
             if '%s_'%var in var_origin:
                 griddata.rename({var_origin: var}, inplace=True)
 
-                
+
 def to_postprocess(griddata, config_file, output_name, type='netcdf'):
     cfg = read_config_file(config_file)
     postprocess_path = cfg['GENERAL']['PostProcessPath']
@@ -466,12 +293,3 @@ def to_postprocess(griddata, config_file, output_name, type='netcdf'):
     elif type == 'zarr':
         griddata.to_zarr(postprocess_path + output_name)
 
-		
-def open_postprocess(config_file, name, chunks=None):
-	cfg = read_config_file(config_file)
-	postprocess_path = cfg['GENERAL']['PostProcessPath']
-	try:
-		griddata = xr.open_dataset(postprocess_path + name, chunks=chunks)
-	except IOError:
-		griddata = xr.open_zarr(postprocess_path + name).chunk(chunks)
-	return griddata
