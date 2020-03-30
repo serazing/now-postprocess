@@ -277,7 +277,9 @@ class DataBase:
             self.cs.write(gdata, chunks=chunks, encoding=encoding, **write_kwargs)
 
     def apply(self, func, simulations=None, model=None):
-        apply_to_database(self, simulations=simulations, model=model)(func)
+        db_func = apply_to_database(self, simulations=simulations,
+                                          model=model)(func)
+        return db_func
 
     def get_model_xgrid(self, model=None):
         """
