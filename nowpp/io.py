@@ -172,6 +172,7 @@ class Cursor:
             self.where = kwargs['where']
         self.set_path()
         self.set_basename()
+        self.nemo_mask = get_nemo_mask(self.config_file, grid=self.grid)
 
     def read(self, **kwargs):
         if self.where == 'raw':
@@ -241,35 +242,50 @@ class DataBase:
         self.cfg = read_config_file(config_file)
         self.cs = Cursor(config_file)
         self.simulations = get_simulations(config_file)
+        self.grids = ['U', 'V', 'T', 'W']
 
-    def open(self, simulations=None, model='nemo'):
+
+    def _combine_grids(self, grids,  **kwargs):
+        list_of_gdata = []
+        for grid in grids:
+            self.cs.set(grid=grid)
+            gdata_grid = self.cs.read(**kwargs)
+            list_of_gdata.append(gdata_grid)
+        gdata = xr.merge(list_of_gdata)
+        return gdata
+
+    def open(self, simulations=None, grids=None, model='nemo', where='raw',  **kwargs):
         list_of_gdata = []
         for sim in simulations:
-            self.cs.set(simulation=sim)
-            ds = self.cs.read()
-        return ds
+            self.cs.set(model=model, simulation=sim, where=where)
+            if model == 'nemo' and where == 'raw':
+                gdata = self._combine_grids(grids, **kwargs)
+            else:
+                gdata = self.cs.read(**kwargs)
+            list_of_gdata.append(gdata)
+        return xr.concat(list_of_gdata, dim='simulaition')
 
-    def netcdf_to_zarr(self, simulations=None, grids=None, model='nemo',
+    def netcdf_to_zarr(self, simulations=None, grids=['T'], model='nemo',
                        read_kwargs={}, write_kwargs={}):
         if simulations is None:
             simulations = self.simulations
         else:
             simulations = _check_simulations(self.config_file, simulations)
         if grids is None:
-            grids = ['T']
+            grids = self.grids
         if 'compressor' not in write_kwargs:
             from zarr import Blosc                                            
             compressor = Blosc(cname='zstd', clevel=3, shuffle=0)
         self.cs.set(model=model)
         for sim in simulations:
-            list_of_gdata = []
-            for grid in grids:
-                self.cs.set(where='raw', simulation=sim, grid=grid)
-                gdata_grid = self.cs.read(parallel=True, **read_kwargs)
-                list_of_gdata.append(gdata_grid)
-            gdata = xr.merge(list_of_gdata)
+            self.cs.set(model=model, simulation=sim, where='raw')
+            if model == 'nemo':
+                gdata = self._combine_grids(grids, **read_kwargs)
+            else:
+                gdata = self.cs.read(**read_kwargs)
             encoding = {var: {'compressor': compressor}
-                        for var in gdata.variables}
+                             for var in gdata.variables
+                        }
             self.cs.set(where='tmp')
             self.cs.write(gdata, encoding=encoding, **write_kwargs)
 
