@@ -185,12 +185,12 @@ class Cursor:
                     new_dims = {dim: new_dims[dim] for dim in new_dims if dim != 'z'}
                     new_coords = {coord: new_coords[coord] for coord in new_coords if coord != 'depth'}
                 gdata = xr.open_mfdataset(self.path + self.basename, **kwargs)
+                gdata = gdata.where(self.nemo_mask == 1)
                 gdata = gdata.set_index(time_counter='time_average_1d')
-                gdata = gdata.rename_dims({'time_counter': 'time'})
+                gdata = gdata.rename({'time_counter': 'time'})
                 gdata = gdata.rename_dims(new_dims)
                 gdata = gdata.rename(new_coords)
                 gdata = gdata.sel(time=slice(self.ystart, self.ystop))
-                gdata = gdata.where(self.nemo_mask == 1)
                 gdata = gdata.expand_dims('simulation')
                 gdata = gdata.assign(simulation=sim_coord)
                 
