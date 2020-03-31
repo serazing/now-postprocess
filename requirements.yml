@@ -4,6 +4,7 @@ channels:
 dependencies:
   - python>=3.6
   - sh
+  - pyyaml
   - jupyterlab
   - nb_conda 
   - xarray
