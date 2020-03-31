@@ -1,4 +1,5 @@
 import xarray as xr
+from xgcm import Grid
 
 NEMO_NEW_DIMS = {'T': {'x': 'x_c', 'y': 'y_c', 'z': 'z_c'},
                  'U': {'x': 'x_r', 'y': 'y_c', 'z': 'z_c'},
@@ -85,4 +86,31 @@ def open_netcdf_dataset(files, grid='T',  **kwargs):
     ds = ds.set_index(time_counter='time_average_1d')
     ds = ds.rename({'time_counter': 'time'})
     ds = ds.rename_coords_and_dims(ds, grid=grid)
+    return ds
+
+
+def build_xgrid(ds, periodic=False):
+    xgrid = Grid(ds, periodic=periodic,
+                 coords={'X': {'center': 'x_c', 'right': 'x_r'},
+                         'Y': {'center': 'y_c', 'right': 'y_r'},
+                         'Z': {'center': 'z_c', 'right': 'z_r'},
+                         },
+                 metrics={('X',): ['dx_T', 'dx_U', 'dx_V', 'dx_F'],
+                          ('Y',): ['dy_T', 'dy_U', 'dy_V', 'dy_F'],
+                          ('Z',): ['dz_T', 'dz_U', 'dz_V'],
+                          }
+                 )
+    return xgrid
+
+
+def update_grid(ds):
+    xgrid = build_xgrid(ds)
+    metrics = {'dxdy_T': xgrid.get_metric(ds.lon_T, ('X', 'Y')),
+               'dxdy_U': xgrid.get_metric(ds.lon_U, ('X', 'Y')),
+               'dxdy_V': xgrid.get_metric(ds.lon_V, ('X', 'Y')),
+               'dxdydz_T': xgrid.get_metric(ds.depth_T, ('X', 'Y', 'Z')),
+               'dxdydz_U': xgrid.get_metric(ds.depth_U, ('X', 'Y', 'Z')),
+               'dxdydz_V': xgrid.get_metric(ds.depth_V, ('X', 'Y',  'Z'))
+               }
+    ds = ds.assign(metrics)
     return ds

@@ -7,8 +7,8 @@ DISTNAME = 'now-postprocess'
 PACKAGES = ['nowpp']
 TESTS = [p + '.tests' for p in PACKAGES]
 INSTALL_REQUIRES = ['xarray', 'numpy >= 1.11',
-                    'matplotlib>=1.5', 'yaml',
-                    'pandas']
+                    'matplotlib>=1.5',
+                    'pandas',]
 TESTS_REQUIRE = ['pytest >= 2.7.1']
 URL = ''
 AUTHOR = 'Guillaume Serazin'

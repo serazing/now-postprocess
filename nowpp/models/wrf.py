@@ -1,5 +1,6 @@
 import xarray as xr
 import pandas as pd
+from xgcm import Grid
 
 WRF_NEW_DIMS = {'south_north': 'y_c', 'south_north_stag': 'y_g',
                 'west_east': 'x_c', 'west_east_stag': 'x_g'}
@@ -45,3 +46,11 @@ def open_netcdf_dataset(files, grid='T',  **kwargs):
     ds = ds.assign_coords(Time=time).rename({'Time': 'time'})
     ds = rename_coords_and_dims(ds)
     return ds
+
+
+def build_xgrid(ds, periodic=False):
+    xgrid = Grid(ds, periodic=periodic,
+                 coords={'X': {'center': 'x_c', 'left': 'x_g'},
+                         'Y': {'center': 'y_c', 'left': 'y_g'}})
+    return xgrid
+
