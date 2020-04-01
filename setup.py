@@ -4,7 +4,7 @@ from os.path import exists
 from setuptools import setup
 
 DISTNAME = 'now-postprocess'
-PACKAGES = ['nowpp']
+PACKAGES = ['nowpp', 'nowpp.models']
 TESTS = [p + '.tests' for p in PACKAGES]
 INSTALL_REQUIRES = ['xarray', 'numpy >= 1.11',
                     'matplotlib>=1.5',
