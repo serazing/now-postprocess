@@ -1,0 +1,80 @@
+name: Sensitivity to mesoscale coupling
+general:
+  project: e14
+  user: gs9353
+  directories:
+    work: /scractch/e14/gs9353/work_meso
+    data: /g/data/e14/gs9353
+date:
+  start: 1990
+  end: 2009
+models:
+    nemo:
+      description: NEMO ocean model
+      directories:
+        raw: raw
+        tmp: tmp
+        res: results
+      grids:
+        - U
+        - V
+        - T
+      dimensions: 2D
+      frequency: 1d
+      files:
+        mesh: /g/data/e14/gs9353/MESH/mesh_mask_cordex24.nc
+        mask: /g/data/e14/gs9353/MESH/mesh_mask_cordex24.nc
+    wrf:
+      description: WRF atmospheric model
+      directories:
+        raw: raw
+        tmp: tmp
+        res: results
+      grids:
+        - U
+        - V
+        - T
+      prefix: wrfout
+      frequency: 6H
+      files:
+        mesh: /g/data/e14/gs9353/MESH/geo_em.d01.nc
+        mask: /g/data/e14/gs9353/MESH/geo_em.d01.nc
+simulations:
+  - name: NOW-CTRL
+    description: Control simulation
+    models:
+      - nemo
+      - wrf
+    prefix: cordex24-BMJv2_BILAP
+    folder: now_cordex24_BMJv2_BILAP
+    mdss:
+      project: e14
+      directory: gs9353/now/output/now_cordex24_BMJv2_BILAP
+  - name: NOW-NoCFB
+    description: Ocean current feedback removed
+    models:
+      - nemo
+      - wrf
+    prefix: cordex24-BMJv2_BILAP_noUoce
+    folder: now_cordex24_BMJv2_BILAP_noUoce
+    mdss:
+      project: e14
+      directory: NICO/now/output/now_cordex24_BMJv2_BILAP_noUoce
+  - name: NOW-NoTFB
+    description: Smoothed SST during the coupling
+    models:
+      - nemo
+      - wrf
+    prefix: cordex24-ls-sst
+    folder: now_cordex24_ls-sst
+    mdss:
+      project: e14
+      directory: gs9353/now/output/now_cordex24_ls
+  - name: WRF-ONLY
+    description: Atmosphere-only simulation forced by the SST from NOW-CTRL
+    models:
+      - wrf
+    folder: wrf_cordex24_with-cpl-sst
+    mdss:
+      project: e14
+      directory: gs9353/now/output/wrf_cordex24_with-cpl-sst
