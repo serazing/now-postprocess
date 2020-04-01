@@ -9,36 +9,36 @@ date:
   start: 1990
   end: 2009
 models:
-    nemo:
-      description: NEMO ocean model
-      directories:
-        raw: raw
-        tmp: tmp
-        res: results
-      grids:
-        - U
-        - V
-        - T
-      dimensions: 2D
-      frequency: 1d
-      files:
-        mesh: /g/data/e14/gs9353/MESH/mesh_mask_cordex24.nc
-        mask: /g/data/e14/gs9353/MESH/mesh_mask_cordex24.nc
-    wrf:
-      description: WRF atmospheric model
-      directories:
-        raw: raw
-        tmp: tmp
-        res: results
-      grids:
-        - U
-        - V
-        - T
-      prefix: wrfout
-      frequency: 6H
-      files:
-        mesh: /g/data/e14/gs9353/MESH/geo_em.d01.nc
-        mask: /g/data/e14/gs9353/MESH/geo_em.d01.nc
+  nemo:
+    description: NEMO ocean model
+    directories:
+      raw: raw
+      tmp: tmp
+      res: results
+    grids:
+      - U
+      - V
+      - T
+    dimensions: 2D
+    frequency: 1d
+    files:
+      mesh: /g/data/e14/gs9353/MESH/mesh_mask_cordex24.nc
+      mask: /g/data/e14/gs9353/MESH/mesh_mask_cordex24.nc
+  wrf:
+    description: WRF atmospheric model
+    directories:
+      raw: raw
+      tmp: tmp
+      res: results
+    grids:
+      - U
+      - V
+      - T
+    prefix: wrfout
+    frequency: 6H
+    files:
+      mesh: /g/data/e14/gs9353/MESH/geo_em.d01.nc
+      mask: /g/data/e14/gs9353/MESH/geo_em.d01.nc
 simulations:
   - name: NOW-CTRL
     description: Control simulation

@@ -24,10 +24,10 @@ NEMO_NEW_COORDS = {'T': {'glamt': 'lon_T',
                    }
 
 
-NEMO_NEW_MASK = {'tmask': 'mask_T',
-                 'umask': 'mask_U',
-                 'vmask': 'mask_V',
-                 'fmask': 'mask_F'}
+NEMO_NEW_MASK = {'T': {'tmask': 'mask_T'},
+                 'U': {'umask': 'mask_U'},
+                 'V': {'vmask': 'mask_V'},
+                 'F': {'fmask': 'mask_F'}}
 
 
 NEMO_NEW_MESH = {'T': {'e1t': 'dx_T',
