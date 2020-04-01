@@ -1,2 +1,1 @@
-from . import nemo
-from . import wrf
+from . import *

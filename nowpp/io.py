@@ -24,18 +24,27 @@ class Config:
         self.conf = read_config_file(file)
 
     def get_start_date(self):
-        return pd.to_datetime(self.conf['date']['start'])
+        return pd.to_datetime(str(self.conf['date']['start']))
 
     def get_end_date(self):
-        return pd.to_datetime(self.conf['date']['end'])
+        return pd.to_datetime(str(self.conf['date']['end']),
+                              format="%Y-%m-%d")
 
     def get_models(self):
         return list(self.conf['models'])
+
+    def get_simulations(self):
+        simulations = {sim['name']: sim for sim in self.conf['simulations']}
+        return simulations
 
     def get_model_simulations(self, model):
         simulations = {sim['name']: sim for sim in self.conf['simulations']
                        if model in sim['models']}
         return simulations
+
+    def get_simulation_models(self, simulation):
+        simulations = self.get_simulations()
+        return simulations[simulation]['models']
 
     def check_simulations(self, simulations, model):
         config_simulations = self.get_model_simulations(model)
@@ -74,12 +83,21 @@ class Config:
             raise ValueError
         return mesh
 
+    def get_workdir(self):
+        return self.conf['general']['directories']['work']
+
+    def get_simulation_folder(self, simulation):
+        simulations = self.get_simulations()
+        return simulations[simulation]['folder']
+
+    def get_model_directory(self, model, where):
+        return self.conf['models'][model]['directories'][where]
+
     def get_path(self, model, simulation, where):
-        simulations = self.get_model_simulations(model)
-        path = os.path.join(self.conf['general']['directories']['work'],
-                            simulations[simulation]['folder'],
+        path = os.path.join(self.get_workdir(),
+                            self.get_simulation_folder(simulation),
                             model,
-                            self.conf['models'][model]['directories'][where])
+                            self.get_model_directory(model, where))
         return path
 
     def get_mdss_path(self,):
@@ -131,10 +149,7 @@ class Cursor:
         self._update_model(model)
         self._update_simulation(simulation)
         self._update_grid(grid)
-        self._update_mask()
-        self._update_mesh()
-        self._update_path()
-        self._update_basename()
+        self._full_update()
 
     def _update_model(self, model):
         models = self.cfg.get_models()
@@ -148,7 +163,7 @@ class Cursor:
     def _update_simulation(self, simulation):
         simulations = list(self.cfg.get_model_simulations(self.model))
         if simulation is None:
-            self.model = simulations[0]
+            self.simulation = simulations[0]
         elif simulation in simulations:
             self.simulation = simulation
         else:
@@ -184,7 +199,7 @@ class Cursor:
         self.mask = self.cfg.get_model_mask(self.model, self.grid)
 
     def _update_mesh(self):
-        self.mask = self.cfg.get_model_mesh(self.model, self.grid)
+        self.mesh = self.cfg.get_model_mesh(self.model, self.grid)
 
     def _full_update(self):
         self._update_path()
@@ -249,11 +264,25 @@ class Cursor:
         else:
             raise ValueError("This engine is not supported")
 
+    def __repr__(self):
+        message = ("Cursor \n" 
+                   "====== \n"
+                   "|-->SIMULATION: %s \n"
+                   "|------->MODEL: %s \n" 
+                   "|------->WHERE: %s \n"
+                   "|-------->GRID: %s \n" 
+                   "\n" 
+                   "Filenames to read/write:\n" 
+                   "%s" % (self.model, self.simulation, self.where,
+                           self.grid, os.path.join(self.path, self.basename))
+                   )
+        return message
+
 
 class DataBase:
 
-    def __init__(self, config_file, model=None, simulations=None, grids=None,
-                 decode_xgrids=False):
+    def __init__(self, config_file, model=None, simulations=None,
+                 grids=None, decode_xgrids=False):
         self.cfg = Config(config_file)
         self.cs = Cursor(config_file)
         if model is None:
@@ -270,6 +299,59 @@ class DataBase:
             self.grids = grids
         if decode_xgrids:
             raise NotImplementedError
+
+    def __repr__(self):
+        simulations = self.cfg.get_simulations()
+        models = self.cfg.get_models()
+        nb_simulations = len(simulations)
+        nb_models = len(models)
+        message = ("Database (simulations: %i, models : %i) \n \n" 
+                   "Simulations: %s \n"
+                   "Models: %s \n \n"
+                   % (nb_simulations, nb_models, list(simulations), models)
+                   )
+        wkdir = self.cfg.get_workdir()
+        wkdir_message =  "%s / \n" % wkdir
+        message += wkdir_message
+        for sim in self.cfg.get_simulations():
+            sim_folder = self.cfg.get_simulation_folder(sim)
+            sim_message = "    | -- %s (%s)/ \n" % (sim_folder, sim)
+            message += sim_message
+            for model in self.cfg.get_simulation_models(sim):
+                model_message = "    | | -- %s / \n" % model
+                message += model_message
+                for where in self.cfg.get_model_directories(model):
+                    if (self.cs.simulation == sim and self.cs.model == model
+                            and self.cs.where == where):
+                        where_message = "--->| | | -- %s / \n" % where
+                    else:
+                        where_message = "    | | | -- %s / \n" % where
+                    message += where_message
+
+                    path = self.cfg.get_path(model, sim, where)
+                    try:
+                        filenames = os.listdir(path)
+                    except FileNotFoundError:
+                        filenames = []
+                    if 0 < len(filenames) <= 10:
+                        for fname in filenames:
+                            file_message = "    | | | | -- %s  \n" % fname
+                            message += file_message
+                    elif len(filenames) > 10:
+                        file_message = ("    | | | | -- %s  \n"
+                                        "    | | | | -- %s  \n"
+                                        "    | | | | -- .  \n"
+                                        "    | | | | -- .  \n"
+                                        "    | | | | -- .  \n"
+                                        "    | | | | -- %s  \n"
+                                        "    | | | | -- %s  \n"
+                                        % (filenames[0],  filenames[1],
+                                           filenames[-2],  filenames[-1])
+                                        )
+                        message += file_message
+                    else:
+                        pass
+        return message
 
     def _combine_grids(self, grids,  **kwargs):
         list_of_gdata = []
