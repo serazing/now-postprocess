@@ -105,8 +105,8 @@ class Config:
 
     def get_basename(self, model, simulation, where, grid):
         simulations = self.get_model_simulations(model)
-        start_date = self.get_start_date()
-        end_date = self.get_end_date()
+        ystart = self.get_start_date().year
+        ystop = self.get_end_date().year
         if model == 'nemo':
             prefix = simulations[simulation]['prefix']
             freq = self.conf['models'][model]['frequency']
@@ -115,16 +115,16 @@ class Config:
                 basename = '%s_%s_*_*_grid_%s_%s.nc' % (prefix, freq, grid,
                                                         dim)
             else:
-                basename = '%s_%s_%s_%s_%s' % (prefix, freq, start_date,
-                                               end_date, dim)
+                basename = '%s_%s_%s_%s_%s' % (prefix, freq, ystart,
+                                               ystop, dim)
         elif model == 'wrf':
             domain = 1
             prefix = self.conf['models'][model]['frequency']
             if where == 'raw':
                 basename = '%s_d%02i_????-??-??_00:00:00' % (prefix, domain)
             else:
-                basename = '%s_d%02i_%s-%s' % (prefix, domain, start_date,
-                                               end_date,)
+                basename = '%s_d%02i_%s-%s' % (prefix, domain, ystart,
+                                               ystop,)
         else:
             raise ValueError
         return basename
