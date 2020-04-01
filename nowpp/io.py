@@ -100,8 +100,13 @@ class Config:
                             self.get_model_directory(model, where))
         return path
 
-    def get_mdss_path(self,):
-        raise NotImplementedError
+    def get_mdss_path(self, simulation):
+        simulations = self.get_simulations()
+        return simulations[simulation]['mdss']['directory']
+
+    def get_mdss_project(self, simulation):
+        simulations = self.get_simulations()
+        return simulations[simulation]['mdss']['project']
 
     def get_basename(self, model, simulation, where, grid):
         simulations = self.get_model_simulations(model)
@@ -196,10 +201,16 @@ class Cursor:
                                               self.where, self.grid)
 
     def _update_mask(self):
-        self.mask = self.cfg.get_model_mask(self.model, self.grid)
+        try:
+            self.mask = self.cfg.get_model_mask(self.model, self.grid)
+        except FileNotFoundError:
+            self.mask = xr.Dataset()
 
     def _update_mesh(self):
-        self.mesh = self.cfg.get_model_mesh(self.model, self.grid)
+        try:
+            self.mesh = self.cfg.get_model_mesh(self.model, self.grid)
+        except FileNotFoundError:
+            self.mesh = xr.Dataset()
 
     def _full_update(self):
         self._update_path()

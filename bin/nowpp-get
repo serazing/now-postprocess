@@ -8,6 +8,7 @@
 #PBS -l wd
 
 import sh
+import os
 import argparse
 import nowpp.io as io
 import sys
@@ -27,14 +28,15 @@ parser.add_argument('--ystop', type=int,
 args = parser.parse_args()
 
 # Read NOW configuration as a global variable
-cfg = io.read_config_file(args.config_file)
-simulations = io.get_simulations(args.config_file)
+cs = io.Cursor(args.config_file)
+
+simulations = cs.cfg.get_simulations()
 if args.ystart is None:
-    ystart = int(cfg['GENERAL']['YearStart'])
+    ystart = cs.cfg.get_start_date().year
 else:
     ystart = args.ystart
 if args.ystop is None:
-    ystop = int(cfg['GENERAL']['YearStop'])
+    ystop = cs.cfg.get_end_date().year
 else:
     ystop = args.ystop
 
@@ -49,31 +51,34 @@ if (not args.nemo) and (not args.wrf):
     print("You must select at least NEMO or WRF outputs to download")
     sys.exit(1)
 
+
 for sim in simulations:
     for year in range(ystart, ystop + 1):
         if args.nemo:
+            model = 'nemo'
             for grid in nemo_grids:
-                print('Downloading NEMO outputs (%s,grid %s, year %s)'
+                print('Downloading  outputs (%s,grid %s, year %s)'
                       % (sim, grid, year))
-                origin = ('%s/%s/%s_%s_*_*_grid_%s_%s.nc'
-                          % (cfg[sim]['MdssPath'], year, cfg[sim]['NemoPrefix'],
-                             cfg['NEMO']['Frequency'], grid,
-                             cfg['NEMO']['Dimensions'])
-                          )
-                dest = '%s/%s/%s/' % (cfg['GENERAL']['WorkDir'],
-                                      cfg[sim]['SimName'],
-                                      cfg['NEMO']['NetCDFPath'])
+                cs.sel(model=model, simulation=sim, grid=grid)
+                basename = cs.cfg.get_basename(model, sim, 'raw', grid)
+                mdss_project = cs.cfg.get_mdss_project()
+                mdss_path = cs.cfg.get_mdss_path()
+                path = cs.cfg.get_path()
+
+                origin = os.path.join(mdss_path, str(year), basename)
+                dest = os.path.join(path, basename)
                 sh.mkdir('-p', dest)
-                sh.mdss('-P', cfg[sim]['MdssProject'], 'get', origin, dest)
+                sh.mdss('-P', mdss_project, 'get', origin, dest)
         if args.wrf:
+            model = 'wrf'
             print('Downloading WRF outputs (%s, year %s)' % (sim, year))
-            origin = ('%s/%s/%s_d%02i_%s-??-??_00:00:00'
-                      % (cfg[sim]['MdssPath'], year, cfg['WRF']['Prefix'],
-                         domain, year)
-                      )
-            dest = '%s/%s/%s/' % (cfg['GENERAL']['WorkDir'],
-                                  cfg[sim]['SimName'],
-                                  cfg['WRF']['NetCDFPath'])
+            cs.sel(model=model, simulation=sim)
+            basename = cs.cfg.get_basename(model, sim, 'raw', None)
+            mdss_project = cs.cfg.get_mdss_project()
+            mdss_path = cs.cfg.get_mdss_path()
+            path = cs.cfg.get_path()
+            origin = os.path.join(mdss_path, str(year), basename)
+            dest = os.path.join(path, basename)
             sh.mkdir('-p', dest)
-            sh.mdss('-P', cfg[sim]['MdssProject'], 'get', origin, dest)
+            sh.mdss('-P', mdss_project, 'get', origin, dest)
 
