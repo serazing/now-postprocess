@@ -231,17 +231,15 @@ class Cursor:
 
     def read(self,  extension='', engine='zarr', **kwargs):
         if self.where == 'raw':
-
+            filenames = os.path.join(self.path, self.basename)
             # Case for opening raw NEMO outputs
             if self.model == 'nemo':
-                gdata = nemo.open_netcdf_dataset(self.path + self.basename,
-                                                 **kwargs)
+                gdata = nemo.open_netcdf_dataset(filenames, **kwargs)
                 mask = self.mask['mask_%s' % self.grid]
                 gdata = gdata.where(mask == 1)
             # Case for opening raw WRF outputs
             elif self.model == 'wrf':
-                gdata = wrf.open_netcdf_dataset(self.path + self.basename,
-                                                **kwargs)
+                gdata = wrf.open_netcdf_dataset(filenames, **kwargs)
             else:
                 raise ValueError("Cannot recognise this type of model")
             # Assign a new dimension corresponding to the simulations
@@ -250,8 +248,9 @@ class Cursor:
             gdata = gdata.expand_dims('simulation')
         else:
             if engine == 'zarr':
-                gdata = xr.open_zarr(self.path + self.basename + '%s.zarr' %
-                                     extension, **kwargs)
+                zarr_folder = self.basename + '%s.zarr' % extension
+                zarr_path = os.path.join(self.path, zarr_folder)
+                gdata = xr.open_zarr(zarr_path, **kwargs)
             elif engine == 'netcdf':
                 raise NotImplementedError
             else:
