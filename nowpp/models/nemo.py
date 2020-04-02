@@ -71,7 +71,7 @@ def read_mesh(file, grids=['U', 'V', 'T', 'F', 'W']):
         coords = original_mesh[list(coord_dict)].rename(coord_dict)
         mesh = mesh.assign_coords(coords).rename_dims(sim_dict)
         list_of_mesh.append(mesh)
-    return xr.merge(mesh)
+    return xr.merge(list_of_mesh)
 
 
 def rename_coords_and_dims(ds, grid='T'):
