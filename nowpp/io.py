@@ -386,6 +386,10 @@ class DataBase:
 
     def netcdf_to_zarr(self, simulations=None, grids=None, model='nemo',
                        chunks=None, read_kwargs=None, write_kwargs=None):
+        if write_kwargs is None:
+            write_kwargs = {}
+        if read_kwargs is None:
+            read_kwargs = {}
         if grids is None:
             grids = self.grids
         if simulations is None:
@@ -397,10 +401,6 @@ class DataBase:
             compressor = Blosc(cname='zstd', clevel=3, shuffle=0)
         else:
             compressor = None
-        if write_kwargs is None:
-            write_kwargs = {}
-        if read_kwargs is None:
-            read_kwargs = {}
         self.cs.sel(model=model)
         for sim in simulations:
             self.cs.sel(model=model, simulation=sim, where='raw')

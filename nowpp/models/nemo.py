@@ -8,6 +8,11 @@ NEMO_NEW_DIMS = {'T': {'x': 'x_c', 'y': 'y_c', 'z': 'z_c'},
                  'W': {'x': 'x_c', 'y': 'y_c', 'z': 'z_r'}
                  }
 
+NEMO_NEW_DIMS_2D = {'T': {'x': 'x_c', 'y': 'y_c'},
+                    'U': {'x': 'x_r', 'y': 'y_c'},
+                    'V': {'x': 'x_c', 'y': 'y_r'},
+                    'F': {'x': 'x_r', 'y': 'y_r'},
+                   }
 
 NEMO_NEW_COORDS = {'T': {'glamt': 'lon_T',
                          'gphit': 'lat_T',
@@ -23,6 +28,15 @@ NEMO_NEW_COORDS = {'T': {'glamt': 'lon_T',
                    'W': {'gdept': 'depth_W'}
                    }
 
+NEMO_NEW_COORDS_2D = {'T': {'glamt': 'lon_T',
+                            'gphit': 'lat_T'},
+                      'U': {'glamu': 'lon_U',
+                            'gphiu': 'lat_U'},
+                      'V': {'glamv': 'lon_V',
+                            'gphiv': 'lat_V'},
+                      'F': {'glamf': 'lon_F',
+                            'gphif': 'lat_F'},
+                     }
 
 NEMO_NEW_MASK = {'T': {'tmask': 'mask_T'},
                  'U': {'umask': 'mask_U'},
@@ -74,18 +88,30 @@ def read_mesh(file, grids=['U', 'V', 'T', 'F', 'W']):
     return xr.merge(list_of_mesh)
 
 
-def rename_coords_and_dims(ds, grid='T'):
-    coord_dict = NEMO_NEW_COORDS[grid]
-    sim_dict = NEMO_NEW_DIMS[grid]
-    ds = ds.rename(coord_dict).rename(sim_dict)
+def rename_dims(ds, grid='T'):
+    if 'z' in ds.dims:
+        dims_dict = NEMO_NEW_DIMS[grid]
+    else:
+        dims_dict = NEMO_NEW_DIMS[grid]
+    try:
+        ds = ds.rename({'time_counter': 'time'})
+    except ValueError:
+        pass
+    ds = ds.rename_dims(dims_dict)
     return ds
 
 
-def open_netcdf_dataset(files, grid='T',  **kwargs):
+def assign_coords(ds, mesh):
+    if 'z_r' in ds.dims or 'z_c' in ds.dims:
+        ds = ds.drop(('nav_lon', 'nav_lat', 'nav_lev'))
+        ds.assigndims_dict = NEMO_NEW_COORDS[grid]
+    ds.assign_coords
+
+
+def open_netcdf_dataset(files, mesh_file, grid='T',  **kwargs):
     ds = xr.open_mfdataset(files, **kwargs)
     ds = ds.set_index(time_counter='time_average_1d')
-    ds = ds.rename({'time_counter': 'time'})
-    ds = ds.rename_coords_and_dims(ds, grid=grid)
+    ds = rename_dims(ds, grid=grid)
     return ds
 
 

@@ -61,10 +61,9 @@ for sim in simulations:
                 basename = cs.cfg.get_basename(model, sim, 'raw', grid)
                 mdss_project = cs.cfg.get_mdss_project(sim)
                 mdss_path = cs.cfg.get_mdss_path(sim)
-                path = cs.cfg.get_path(model, sim, 'raw')
+                dest = cs.cfg.get_path(model, sim, 'raw') + '/'
 
                 origin = os.path.join(mdss_path, str(year), basename)
-                dest = os.path.join(path, basename)
                 sh.mkdir('-p', dest)
                 sh.mdss('-P', mdss_project, 'get', origin, dest)
         if args.wrf:
@@ -74,9 +73,8 @@ for sim in simulations:
             basename = cs.cfg.get_basename(model, sim, 'raw', None)
             mdss_project = cs.cfg.get_mdss_project(sim)
             mdss_path = cs.cfg.get_mdss_path(sim)
-            path = cs.cfg.get_path(model, sim, 'raw')
             origin = os.path.join(mdss_path, str(year), basename)
-            dest = os.path.join(path, basename)
+            dest = cs.cfg.get_path(model, sim, 'raw') + '/'
             sh.mkdir('-p', dest)
             sh.mdss('-P', mdss_project, 'get', origin, dest)
 

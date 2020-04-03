@@ -31,7 +31,7 @@ def read_mesh(file):
 
 
 def rename_coords_and_dims(ds, grid='T'):
-    ds = ds.rename(WRF_NEW_COORDS).rename_dims(WRF_NEW_DIMS)
+    ds = ds.rename(WRF_NEW_COORDS).rename(WRF_NEW_DIMS)
     return ds
 
 
