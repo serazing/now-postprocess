@@ -83,6 +83,10 @@ class Config:
             raise ValueError
         return mesh
 
+    def get_model_mesh_file(self, model):
+        file = self.conf['models'][model]['files']['mesh']
+        return file
+
     def get_workdir(self):
         return self.conf['general']['directories']['work']
 
@@ -148,8 +152,7 @@ class Cursor:
         self.time_slice = time_slice
         self.path = None
         self.basename = None
-        self.mask = None
-        self.mesh = None
+        self.mesh_file = None
         # Apply methods to update previous values
         self._update_model(model)
         self._update_simulation(simulation)
@@ -207,16 +210,17 @@ class Cursor:
             self.mask = xr.Dataset()
 
     def _update_mesh(self):
-        try:
-            self.mesh = self.cfg.get_model_mesh(self.model, self.grid)
-        except FileNotFoundError:
-            self.mesh = xr.Dataset()
+        self.mesh_file = self.cfg.get_model_mesh_file(self.model)
+        # try:
+        #    self.mesh = self.cfg.get_model_mesh(self.model, self.grid)
+        # except FileNotFoundError:
+        #    self.mesh = xr.Dataset()
 
     def _full_update(self):
         self._update_path()
         self._update_basename()
-        self._update_mask()
         self._update_mesh()
+        # self._update_mask()
 
     def sel(self, **kwargs):
         if 'model' in kwargs:
@@ -235,11 +239,10 @@ class Cursor:
             # Case for opening raw NEMO outputs
             if self.model == 'nemo':
                 gdata = nemo.open_netcdf_dataset(filenames, **kwargs)
-                mask = self.mask['mask_%s' % self.grid]
-                gdata = gdata.where(mask == 1)
             # Case for opening raw WRF outputs
             elif self.model == 'wrf':
-                gdata = wrf.open_netcdf_dataset(filenames, **kwargs)
+                gdata = wrf.open_netcdf_dataset(filenames, self.mesh_file,
+                                                **kwargs)
             else:
                 raise ValueError("Cannot recognise this type of model")
             # Assign a new dimension corresponding to the simulations
@@ -321,7 +324,7 @@ class DataBase:
                    % (nb_simulations, nb_models, list(simulations), models)
                    )
         wkdir = self.cfg.get_workdir()
-        wkdir_message =  "%s / \n" % wkdir
+        wkdir_message = "%s / \n" % wkdir
         message += wkdir_message
         for sim in self.cfg.get_simulations():
             sim_folder = self.cfg.get_simulation_folder(sim)
@@ -350,9 +353,7 @@ class DataBase:
                     elif len(filenames) > 10:
                         file_message = ("    | | | | -- %s  \n"
                                         "    | | | | -- %s  \n"
-                                        "    | | | | -- .  \n"
-                                        "    | | | | -- .  \n"
-                                        "    | | | | -- .  \n"
+                                        "    | | | | -- ...  \n"
                                         "    | | | | -- %s  \n"
                                         "    | | | | -- %s  \n"
                                         % (filenames[0],  filenames[1],
@@ -409,7 +410,7 @@ class DataBase:
             else:
                 gdata = self.cs.read(**read_kwargs)
             encoding = {var: {'compressor': compressor}
-                             for var in gdata.variables}
+                        for var in gdata.variables}
             self.cs.sel(where='tmp')
             self.cs.write(gdata, chunks=chunks, encoding=encoding,
                           **write_kwargs)
@@ -434,10 +435,10 @@ class DataBase:
             The XGCM grid object for performing computation on the grid
         """
         raise NotImplementedError
-        if model is None:
-            model = self.model[0]
-        xgrid = self.xgrids[model]
-        return xgrid
+        # if model is None:
+        #    model = self.model[0]
+        # xgrid = self.xgrids[model]
+        # return xgrid
 
 
 def apply_to_database(db, **options):
@@ -460,7 +461,8 @@ def apply_to_database(db, **options):
             # Loop over simulations
             for sim in simulations:
                 db.cursor.sel(simulation=sim, model=model, where='tmp')
-                print("Applying %s on %s outputs (%s)" % (func.__name__, model, sim))
+                print("Applying %s on %s outputs (%s)" % (func.__name__,
+                                                          model, sim))
                 gdata = db.cursor.read()
                 res = func(gdata, **kwargs)
                 db.cursor.sel(where='climatology')

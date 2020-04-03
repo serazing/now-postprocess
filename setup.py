@@ -8,7 +8,7 @@ PACKAGES = ['nowpp', 'nowpp.models']
 TESTS = [p + '.tests' for p in PACKAGES]
 INSTALL_REQUIRES = ['xarray', 'numpy >= 1.11',
                     'matplotlib>=1.5',
-                    'pandas',]
+                    'pandas', 'xgcm', 'pyyaml', 'zarr']
 TESTS_REQUIRE = ['pytest >= 2.7.1']
 URL = ''
 AUTHOR = 'Guillaume Serazin'

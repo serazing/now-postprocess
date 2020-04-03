@@ -12,7 +12,7 @@ NEMO_NEW_DIMS_2D = {'T': {'x': 'x_c', 'y': 'y_c'},
                     'U': {'x': 'x_r', 'y': 'y_c'},
                     'V': {'x': 'x_c', 'y': 'y_r'},
                     'F': {'x': 'x_r', 'y': 'y_r'},
-                   }
+                    }
 
 NEMO_NEW_COORDS = {'T': {'glamt': 'lon_T',
                          'gphit': 'lat_T',
@@ -36,7 +36,7 @@ NEMO_NEW_COORDS_2D = {'T': {'glamt': 'lon_T',
                             'gphiv': 'lat_V'},
                       'F': {'glamf': 'lon_F',
                             'gphif': 'lat_F'},
-                     }
+                      }
 
 NEMO_NEW_MASK = {'T': {'tmask': 'mask_T'},
                  'U': {'umask': 'mask_U'},
@@ -60,7 +60,9 @@ NEMO_NEW_MESH = {'T': {'e1t': 'dx_T',
                  }
 
 
-def read_mask(file, grids=['U', 'V', 'T', 'F']):
+def read_mask(file, grids=None):
+    if grids is None:
+        grids = ['U', 'V', 'T', 'F']
     original_mask = xr.open_dataset(file, chunks={}).squeeze()
     list_of_mask = []
     for grid in grids:
@@ -74,7 +76,9 @@ def read_mask(file, grids=['U', 'V', 'T', 'F']):
     return xr.merge(list_of_mask)
 
 
-def read_mesh(file, grids=['U', 'V', 'T', 'F', 'W']):
+def read_mesh(file, grids=None):
+    if grids is None:
+        grids = ['U', 'V', 'T', 'F', 'W']
     original_mesh = xr.open_dataset(file, chunks={}).squeeze()
     list_of_mesh = []
     for grid in grids:
@@ -92,26 +96,43 @@ def rename_dims(ds, grid='T'):
     if 'z' in ds.dims:
         dims_dict = NEMO_NEW_DIMS[grid]
     else:
-        dims_dict = NEMO_NEW_DIMS[grid]
+        dims_dict = NEMO_NEW_DIMS_2D[grid]
+    ds = ds.rename_dims(dims_dict)
+    try:
+        ds = ds.set_index(time_counter='time_average_1d')
+    except ValueError:
+        pass
     try:
         ds = ds.rename({'time_counter': 'time'})
     except ValueError:
         pass
-    ds = ds.rename_dims(dims_dict)
     return ds
 
 
-def assign_coords(ds, mesh):
-    if 'z_r' in ds.dims or 'z_c' in ds.dims:
+def assign_coords(ds, mesh, grid='T'):
+    if grid == 'W':
         ds = ds.drop(('nav_lon', 'nav_lat', 'nav_lev'))
-        ds.assigndims_dict = NEMO_NEW_COORDS[grid]
-    ds.assign_coords
+        ds = ds.assign_coords(mesh.variables)
+    elif grid == ['U', 'V', 'T', 'F']:
+        if 'z_c' in ds.dims:
+            ds = ds.drop(('nav_lon', 'nav_lat', 'nav_lev'))
+            ds = ds.assign_coords(mesh.variables)
+        else:
+            ds = ds.drop(('nav_lon', 'nav_lat'))
+            ds = ds.assign_coords(mesh.drop('z_c').variables)
+    else:
+        raise ValueError
+    return ds
 
 
-def open_netcdf_dataset(files, mesh_file, grid='T',  **kwargs):
+def open_netcdf_dataset(files, mesh_file=None, grid='T',  **kwargs):
     ds = xr.open_mfdataset(files, **kwargs)
-    ds = ds.set_index(time_counter='time_average_1d')
     ds = rename_dims(ds, grid=grid)
+    if mesh_file is not None:
+        mesh = read_mesh(mesh_file, grids=[grid])
+        ds = assign_coords(ds, mesh, grid=grid)
+        mask = ds['mask_%s'] % grid
+        ds = ds.where(mask == 1)
     return ds
 
 
