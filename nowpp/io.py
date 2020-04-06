@@ -238,7 +238,9 @@ class Cursor:
             filenames = os.path.join(self.path, self.basename)
             # Case for opening raw NEMO outputs
             if self.model == 'nemo':
-                gdata = nemo.open_netcdf_dataset(filenames, **kwargs)
+                gdata = nemo.open_netcdf_dataset(filenames, 
+                                                 mesh_file=self.mesh_file, 
+                                                 grid=self.grid, **kwargs)
             # Case for opening raw WRF outputs
             elif self.model == 'wrf':
                 gdata = wrf.open_netcdf_dataset(filenames, self.mesh_file,
@@ -248,7 +250,7 @@ class Cursor:
             # Assign a new dimension corresponding to the simulations
             sim_coord = xr.DataArray([self.simulation, ], dims='simulation')
             gdata = gdata.assign(simulation=sim_coord)
-            gdata = gdata.expand_dims('simulation')
+            #gdata = gdata.expand_dims('simulation')
         else:
             if engine == 'zarr':
                 zarr_folder = self.basename + '%s.zarr' % extension
@@ -411,6 +413,7 @@ class DataBase:
                 gdata = self.cs.read(**read_kwargs)
             encoding = {var: {'compressor': compressor}
                         for var in gdata.variables}
+            print(gdata)
             self.cs.sel(where='tmp')
             self.cs.write(gdata, chunks=chunks, encoding=encoding,
                           **write_kwargs)

@@ -113,26 +113,43 @@ def assign_coords(ds, mesh, grid='T'):
     if grid == 'W':
         ds = ds.drop(('nav_lon', 'nav_lat', 'nav_lev'))
         ds = ds.assign_coords(mesh.variables)
-    elif grid == ['U', 'V', 'T', 'F']:
+    elif grid in ['U', 'V', 'T', 'F']:
         if 'z_c' in ds.dims:
             ds = ds.drop(('nav_lon', 'nav_lat', 'nav_lev'))
             ds = ds.assign_coords(mesh.variables)
         else:
             ds = ds.drop(('nav_lon', 'nav_lat'))
-            ds = ds.assign_coords(mesh.drop('z_c').variables)
+            ds = ds.assign_coords(mesh.drop_dims('z_c').variables)
     else:
         raise ValueError
     return ds
 
 
+def assign_mask(ds, mask, grid='T'):
+    if grid == 'W':
+        ds = ds.assign_coords(mask['mask_%s'] % grid)
+    elif grid in ['U', 'V', 'T', 'F']:
+        if 'z_c' in ds.dims:
+            ds = ds.assign_coords(mask['mask_%s' % grid])
+        else:
+            mask = mask.drop('depth_%s' % grid)
+            ds = ds.assign_coords(mask.isel(z_c=0).squeeze())
+    else:
+        raise ValueError
+    ds = ds.where(ds['mask_%s' % grid] == 1)
+    return ds
+
+
 def open_netcdf_dataset(files, mesh_file=None, grid='T',  **kwargs):
+    #def drop_coords(ds):
+    #    return ds.reset_coords(drop=True)
     ds = xr.open_mfdataset(files, **kwargs)
     ds = rename_dims(ds, grid=grid)
     if mesh_file is not None:
         mesh = read_mesh(mesh_file, grids=[grid])
         ds = assign_coords(ds, mesh, grid=grid)
-        mask = ds['mask_%s'] % grid
-        ds = ds.where(mask == 1)
+        mask = read_mask(mesh_file, grids=[grid])
+        ds = assign_mask(ds, mask, grid=grid)
     return ds
 
 
