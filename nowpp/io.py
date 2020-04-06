@@ -434,14 +434,19 @@ class DataBase:
             return ds.mean(**kwargs)
         return func(dim=dim)
 
+    def std(self, dim=None, write=False, save_engine='netcdf'):
+        @apply_to_database(self, save_engine=save_engine,
+                           extension='_std', write=write)
+        def func(ds, **kwargs):
+            return ds.std(**kwargs)
+        return func(dim=dim)
+
     def seasonal_cycle(self, freq='dayofyear', write=False):
         @apply_to_database(self, save_engine='zarr',
                            extension='_seasonal_cycle', write=write)
         def func(ds):
             return ds.groupby('time.%s' % freq).mean('time')
         return func()
-
-    #def std(self, freq):
 
     def apply(self, func, simulations=None, model=None, **kwargs):
         if model is None:
