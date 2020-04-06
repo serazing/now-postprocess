@@ -381,14 +381,18 @@ class DataBase:
         return gdata
 
     def open(self, simulations=None, grids=None, model='nemo', where='raw',
-             **kwargs):
+             extension='', **kwargs):
+        if model is None:
+            model = self.model
+        if simulations is None:
+            simulations = self.cfg.get_model_simulations(model)
         list_of_gdata = []
         for sim in simulations:
             self.cs.sel(model=model, simulation=sim, where=where)
             if model == 'nemo' and where == 'raw':
                 gdata = self._combine_grids(grids, **kwargs)
             else:
-                gdata = self.cs.read(**kwargs)
+                gdata = self.cs.read(extension=extension, **kwargs)
             list_of_gdata.append(gdata)
         return xr.concat(list_of_gdata, dim='simulation')
 
@@ -423,10 +427,35 @@ class DataBase:
             self.cs.write(gdata, chunks=chunks, encoding=encoding,
                           **write_kwargs)
 
-    def apply(self, func, simulations=None, model=None):
-        db_func = apply_to_database(self, simulations=simulations,
+    def mean(self, dim=None, write=False, save_engine='netcdf'):
+        @apply_to_database(self, save_engine=save_engine,
+                           extension='_mean', write=write)
+        def func(ds, **kwargs):
+            return ds.mean(**kwargs)
+        return func(dim=dim)
+
+    def seasonal_cycle(self, freq='dayofyear', write=False):
+        @apply_to_database(self, save_engine='zarr',
+                           extension='_seasonal_cycle', write=write)
+        def func(ds):
+            return ds.groupby('time.%s' % freq).mean('time')
+        return func()
+
+    #def std(self, freq):
+
+    def apply(self, func, simulations=None, model=None, **kwargs):
+        if model is None:
+            self.model = self.cfg.get_models()[0]
+        else:
+            self.model = model
+        if simulations is None:
+            self.simulations = self.cfg.get_model_simulations(self.model)
+        else:
+            self.simulations = simulations
+        db_func = apply_to_database(self,
+                                    simulations=simulations,
                                     model=model)(func)
-        return db_func
+        return db_func(**kwargs)
 
     def get_model_xgrid(self, model=None):
         """
@@ -448,19 +477,26 @@ class DataBase:
         # xgrid = self.xgrids[model]
         # return xgrid
 
+    def write(self, ds, extension='', save_engine='netcdf', **kwargs):
+        for ds_sim in list(ds.groupby('simulation')):
+            sim = ds_sim.simulation.data
+            self.cs.sel(simulation=sim, where='tmp')
+            self.cs.write(ds_sim, extension=extension, save_engine=save_engine,
+                          **kwargs)
+
 
 def apply_to_database(db, **options):
     def decorator(func):
         def call(*args, **kwargs):
             # Checking kwargs
-            if 'simulations' in options:
-                simulations = options['simulations']
-            else:
-                simulations = db.simulations
             if 'model' in options:
                 model = options['model']
             else:
                 model = db.model
+            if 'simulations' in options:
+                simulations = options['simulations']
+            else:
+                simulations = db.simulations
             if 'save_engine' in options:
                 save_engine = options['save_engine']
             else:
@@ -469,14 +505,16 @@ def apply_to_database(db, **options):
                 extension = options['extension']
             else:
                 extension = '_%s' % func.__name__
+            if 'write' in options:
+                write = options['write']
+            else:
+                write = False
             # Loop over simulations
-            for sim in simulations:
-                db.cs.sel(simulation=sim, model=model, where='tmp')
-                print("Applying %s on %s outputs (%s)" % (func.__name__,
-                                                          model, sim))
-                gdata = db.cs.read()
-                res = func(gdata, **kwargs)
-                db.cs.sel(where='res')
-                db.cs.write(res, engine=save_engine, extension=extension)
+            gdata = db.open(model=model, simulations=simulations, where='tmp')
+            print("Applying %s on %s outputs" % (func.__name__, model))
+            res = func(gdata, **kwargs)
+            if write:
+                db.cursor.write(res, engine=save_engine, extension=extension)
+            return res
         return call
     return decorator
