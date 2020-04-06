@@ -271,11 +271,13 @@ class Cursor:
             raise ValueError('Cannot write in the raw directory')
         self.sel(where=where)
         if engine == 'zarr':
-            gdata.to_zarr(self.path + self.basename + '%s.zarr' % extension,
-                          **kwargs)
+            folder = os.path.join(self.path,
+                                    self.basename + '%s.zarr' % extension)
+            gdata.to_zarr(folder, **kwargs)
         elif engine == 'netcdf':
-            gdata.to_netcdf(self.path + self.basename + '%s.nc' % extension,
-                            **kwargs)
+            filename = os.path.join(self.path,
+                                    self.basename + '%s.nc' % extension)
+            gdata.to_netcdf(filename, **kwargs)
         else:
             raise ValueError("This engine is not supported")
 
