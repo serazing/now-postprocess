@@ -427,15 +427,15 @@ class DataBase:
             self.cs.write(gdata, chunks=chunks, encoding=encoding,
                           **write_kwargs)
 
-    def mean(self, dim=None, write=False, save_engine='netcdf'):
-        @apply_to_database(self, save_engine=save_engine,
+    def mean(self, dim=None, write=False, engine='netcdf'):
+        @apply_to_database(self, engine=engine,
                            extension='_mean', write=write)
         def func(ds, **kwargs):
             return ds.mean(**kwargs)
         return func(dim=dim)
 
     def seasonal_cycle(self, freq='dayofyear', write=False):
-        @apply_to_database(self, save_engine='zarr',
+        @apply_to_database(self, engine='zarr',
                            extension='_seasonal_cycle', write=write)
         def func(ds):
             return ds.groupby('time.%s' % freq).mean('time')
@@ -477,11 +477,11 @@ class DataBase:
         # xgrid = self.xgrids[model]
         # return xgrid
 
-    def write(self, ds, extension='', save_engine='netcdf', **kwargs):
-        for ds_sim in list(ds.groupby('simulation')):
-            sim = ds_sim.simulation.data
+    def write(self, ds, extension='', engine='netcdf', **kwargs):
+        ds_dict = dict(ds.groupby('simulation'))
+        for sim in ds_dict:
             self.cs.sel(simulation=sim, where='tmp')
-            self.cs.write(ds_sim, extension=extension, save_engine=save_engine,
+            self.cs.write(ds_dict[sim], extension=extension, engine=engine,
                           **kwargs)
 
 
@@ -511,10 +511,10 @@ def apply_to_database(db, **options):
                 write = False
             # Loop over simulations
             gdata = db.open(model=model, simulations=simulations, where='tmp')
-            print("Applying %s on %s outputs" % (func.__name__, model))
+            print("Applying %s on %s outputs" % (extension, model))
             res = func(gdata, **kwargs)
             if write:
-                db.cursor.write(res, engine=save_engine, extension=extension)
+                db.write(res, engine=engine, extension=extension)
             return res
         return call
     return decorator
