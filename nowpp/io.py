@@ -1,5 +1,6 @@
 import xarray as xr
 import os
+import sh
 import pandas as pd
 from .models import nemo, wrf
 
@@ -271,6 +272,7 @@ class Cursor:
         elif where == 'raw':
             raise ValueError('Cannot write in the raw directory')
         self.sel(where=where)
+        sh.mkdir('-p', self.path)
         if engine == 'zarr':
             zarr_folder = self.basename + '%s.zarr' % extension
             zarr_path = os.path.join(self.path, zarr_folder)
@@ -466,15 +468,15 @@ def apply_to_database(db, **options):
             if 'extension' in options:
                 extension = options['extension']
             else:
-                extension = func.__name__
+                extension = '_%s' % func.__name__
             # Loop over simulations
             for sim in simulations:
-                db.cursor.sel(simulation=sim, model=model, where='tmp')
+                db.cs.sel(simulation=sim, model=model, where='tmp')
                 print("Applying %s on %s outputs (%s)" % (func.__name__,
                                                           model, sim))
-                gdata = db.cursor.read()
+                gdata = db.cs.read()
                 res = func(gdata, **kwargs)
-                db.cursor.sel(where='res')
-                db.cursor.write(res, engine=save_engine, extension=extension)
+                db.cs.sel(where='res')
+                db.cs.write(res, engine=save_engine, extension=extension)
         return call
     return decorator
