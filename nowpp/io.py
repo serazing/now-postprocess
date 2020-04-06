@@ -250,14 +250,15 @@ class Cursor:
             # Assign a new dimension corresponding to the simulations
             sim_coord = xr.DataArray([self.simulation, ], dims='simulation')
             gdata = gdata.assign(simulation=sim_coord)
-            #gdata = gdata.expand_dims('simulation')
         else:
             if engine == 'zarr':
                 zarr_folder = self.basename + '%s.zarr' % extension
                 zarr_path = os.path.join(self.path, zarr_folder)
                 gdata = xr.open_zarr(zarr_path, **kwargs)
             elif engine == 'netcdf':
-                raise NotImplementedError
+                filename = self.basename + '%s.nc' % extension
+                netcdf_path = os.path.join(self.path, filename)
+                gdata = xr.open_dataset(netcdf_path, **kwargs)
             else:
                 raise ValueError("This engine is not supported")
         return gdata
@@ -271,13 +272,13 @@ class Cursor:
             raise ValueError('Cannot write in the raw directory')
         self.sel(where=where)
         if engine == 'zarr':
-            folder = os.path.join(self.path,
-                                    self.basename + '%s.zarr' % extension)
-            gdata.to_zarr(folder, **kwargs)
+            zarr_folder = self.basename + '%s.zarr' % extension
+            zarr_path = os.path.join(self.path, zarr_folder)
+            gdata.to_zarr(zarr_path, **kwargs)
         elif engine == 'netcdf':
-            filename = os.path.join(self.path,
-                                    self.basename + '%s.nc' % extension)
-            gdata.to_netcdf(filename, **kwargs)
+            filename = self.basename + '%s.nc' % extension
+            netcdf_path = os.path.join(self.path, filename)
+            gdata.to_netcdf(netcdf_path, **kwargs)
         else:
             raise ValueError("This engine is not supported")
 
@@ -449,7 +450,6 @@ class DataBase:
 def apply_to_database(db, **options):
     def decorator(func):
         def call(*args, **kwargs):
-            output_name = 'analysis'
             # Checking kwargs
             if 'simulations' in options:
                 simulations = options['simulations']
@@ -463,6 +463,10 @@ def apply_to_database(db, **options):
                 save_engine = options['save_engine']
             else:
                 save_engine = 'netcdf'
+            if 'extension' in options:
+                extension = options['extension']
+            else:
+                extension = func.__name__
             # Loop over simulations
             for sim in simulations:
                 db.cursor.sel(simulation=sim, model=model, where='tmp')
@@ -470,8 +474,7 @@ def apply_to_database(db, **options):
                                                           model, sim))
                 gdata = db.cursor.read()
                 res = func(gdata, **kwargs)
-                db.cursor.sel(where='climatology')
-                db.cursor.write(res, engine=save_engine,
-                                extension=func.__name__)
+                db.cursor.sel(where='res')
+                db.cursor.write(res, engine=save_engine, extension=extension)
         return call
     return decorator
