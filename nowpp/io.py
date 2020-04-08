@@ -435,7 +435,7 @@ class DataBase:
         return func(dim=dim)
 
     def std(self, dim=None, write=False, save_engine='netcdf'):
-        @apply_to_database(self, save_engine=save_engine,
+        @apply_to_database(self, engine=engine,
                            extension='_std', write=write)
         def func(ds, **kwargs):
             return ds.std(**kwargs)
@@ -502,8 +502,8 @@ def apply_to_database(db, **options):
                 simulations = options['simulations']
             else:
                 simulations = db.simulations
-            if 'save_engine' in options:
-                save_engine = options['save_engine']
+            if 'engine' in options:
+                engine = options['engine']
             else:
                 save_engine = 'netcdf'
             if 'extension' in options:
