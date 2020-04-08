@@ -155,10 +155,11 @@ def match_cyclone_events(cyclone_test, cyclone_ref,
     ds_test = ds_test.assign_coords(event_test=event_test)
     ds_test_stacked = (ds_test.stack(pass_test=('event_test', 'time_test'))
                               .dropna('pass_test').chunk({'pass_test': 5e3}))
+    # Compute time lag between cyclones
+    dt = np.abs(ds_test_stacked['date'] - ds_ref_stacked['date'])
+    dt = dt.astype('f4') * 1e-9 / 3600.
     # Compute distance between cyclone centers
     lon_ref, lat_ref = ds_ref_stacked['lon'], ds_ref_stacked['lat']
-    dt = np.abs(ds_test_stacked['time_counter'] -
-                ds_ref_stacked['time_counter'])
     dlon = ds_test_stacked['lon'] - lon_ref
     dlat = ds_test_stacked['lat'] - lat_ref
     dx = np.cos(np.pi / 180. * lat_ref) * np.pi / 180. * EARTH_RADIUS * dlon    
