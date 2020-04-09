@@ -3,6 +3,7 @@ import xarray as xr
 import pandas as pd
 import wrf
 from . import geometry
+import matplotlib.pyplot as plt
 
 EARTH_RADIUS = 6371 * 1e3
 
@@ -297,27 +298,6 @@ def align_cyclone_with_max_pressure_gradient(cyclone_dataset, lag=6, dt=6):
         cyclone_mpi = xr.concat(list_of_cyclone, dim='event')
         aligned_dataset[sim] = cyclone_mpi
     return aligned_dataset
-
-
-def plot_pressure_gradient_profile(cyclone_dataset,
-                                   season='Cool',
-                                   lat_min=-50, lat_max=0):
-    for sim in cyclone_dataset:
-        cyclone_data = get_data_by_season(cyclone_dataset[sim], season=season)
-        lat = cyclone_data['lat']
-        cyclone_data = cyclone_data.where((lat >= lat_min) & (lat <= lat_max))
-        median = cyclone_data.pressure_gradient.median(('event', 'time'))
-        lower_quartile = cyclone_data.pressure_gradient.quantile(0.25, ('event', 'time'))
-        upper_quartile = cyclone_data.pressure_gradient.quantile(0.75, ('event', 'time'))
-        median.plot(color=dict_color[sim], lw=3, label=sim)
-        upper_quartile.plot(color=dict_color[sim], ls='--')
-        lower_quartile.plot(color=dict_color[sim], ls='--')
-        #plt.fill_between(median.distance, upper_quartile, lower_quartile, alpha=0.25, lw=0, color=dict_color[sim])
-    plt.legend(loc='lower right')
-    plt.xlim([0, 600])
-    plt.ylabel('Pressure gradient')
-    plt.xlabel('dx (km)')
-    plt.grid()
 
 
 def bin_data(data,
