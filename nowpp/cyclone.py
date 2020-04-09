@@ -209,7 +209,117 @@ def get_cyclone_imprint(cyclone_location, wrfout, n=0):
     gdata_cyclone = xr.concat(list_of_pass, dim='time')
     return gdata_cyclone
 
-            
+
+def get_data_by_season(ecl_data, season='Warm'):
+    """
+    Get the data corresponding to a particular season.
+
+    Parameters
+    ----------
+    ecl_data : xarray.Dataset
+        The ECL data corresponding to one simulation
+    season : {'Warm', 'Cool'}, optional
+        The seasonal months to select a particular season. Default is 'DJF'
+
+    Returns
+    -------
+    res : xarray.Dataset
+        A Dataset including only the season precised
+    """
+    if season == 'Warm':
+        months = [11, 12, 1, 2, 3, 4]
+    elif season == 'Cool':
+        months = [5, 6, 7, 8, 9, 10]
+    else:
+        raise ValueError
+    cond = ecl_data.month.isin(months)
+    ecl_data_by_season = ecl_data.where(cond, drop=True)
+    return ecl_data_by_season
+
+
+def get_number_of_events(ecl_data, season=None):
+    """
+    Get the number of events by returning the size of the event dimension.
+    If the season is precised, return only the number of event for this season.
+
+    Parameters
+    ----------
+    ecl_data : xarray.DataSet
+        The ECL data corresponding to one simulation
+    season : {'Warm', 'Cool'}, optional
+        The seasonal months to select a particular season
+
+    Returns
+    -------
+    n_events : int
+        The number of ECL events
+    """
+    if season is None:
+        n_events = ecl_data.sizes['event']
+    else:
+        n_events = get_data_by_season(ecl_data, season=season).sizes['event']
+    return n_events
+
+
+def filter_events(cyclone_dataset, season='Cool',
+                  lat_min=-50, lat_max=0, min_duration=18):
+    filtered_dataset = {}
+    for sim in cyclone_dataset:
+        cyclone_data = get_data_by_season(cyclone_dataset[sim], season=season)
+        lat = cyclone_data['lat']
+        cyclone_data = cyclone_data.where((lat >= lat_min) & (lat <= lat_max))
+        cyclone_data = cyclone_data.where(cyclone_data.duration
+                                          >= min_duration, drop=True)
+        filtered_dataset[sim] = cyclone_data
+    return filtered_dataset
+
+
+def align_cyclone_with_max_pressure_gradient(cyclone_dataset, lag=6, dt=6):
+    aligned_dataset = {}
+    for sim in cyclone_dataset:
+        cyclone_data = cyclone_dataset[sim]
+        list_of_cyclone = []
+        lag_coord = np.arange(-lag * dt, (lag + 1) * dt, dt)
+        mpi = cyclone_data.pressure_gradient.sel(distance=300).argmax('time')
+        event_index = 0
+        for ind in mpi.data:
+            timesteps = np.arange(-lag + ind, lag + ind + 1)
+            cond = np.where(timesteps > 0)
+            try:
+                cyclone_mpi = (cyclone_data.isel(time=timesteps[cond])
+                                           .isel(event=event_index))
+                cyclone_mpi = cyclone_mpi.rename({'time': 'lag'})
+                cyclone_mpi['lag'] = lag_coord[cond]
+                list_of_cyclone.append(cyclone_mpi)
+            except IndexError:
+                pass
+            event_index += 1
+        cyclone_mpi = xr.concat(list_of_cyclone, dim='event')
+        aligned_dataset[sim] = cyclone_mpi
+    return aligned_dataset
+
+
+def plot_pressure_gradient_profile(cyclone_dataset,
+                                   season='Cool',
+                                   lat_min=-50, lat_max=0):
+    for sim in cyclone_dataset:
+        cyclone_data = get_data_by_season(cyclone_dataset[sim], season=season)
+        lat = cyclone_data['lat']
+        cyclone_data = cyclone_data.where((lat >= lat_min) & (lat <= lat_max))
+        median = cyclone_data.pressure_gradient.median(('event', 'time'))
+        lower_quartile = cyclone_data.pressure_gradient.quantile(0.25, ('event', 'time'))
+        upper_quartile = cyclone_data.pressure_gradient.quantile(0.75, ('event', 'time'))
+        median.plot(color=dict_color[sim], lw=3, label=sim)
+        upper_quartile.plot(color=dict_color[sim], ls='--')
+        lower_quartile.plot(color=dict_color[sim], ls='--')
+        #plt.fill_between(median.distance, upper_quartile, lower_quartile, alpha=0.25, lw=0, color=dict_color[sim])
+    plt.legend(loc='lower right')
+    plt.xlim([0, 600])
+    plt.ylabel('Pressure gradient')
+    plt.xlabel('dx (km)')
+    plt.grid()
+
+
 def bin_data(data,
              lon_min=0., lon_max=360., lon_res=1.,
              lat_min=-80., lat_max=80, lat_res=1.):
