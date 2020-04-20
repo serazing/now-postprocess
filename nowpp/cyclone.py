@@ -264,6 +264,9 @@ def get_number_of_events(ecl_data, season=None):
 
 def filter_events(cyclone_dataset, season='Cool',
                   lat_min=-50, lat_max=0, min_duration=18):
+    """
+    Filter the cyclone events based on the season and latitudinal criteria
+    """
     filtered_dataset = {}
     for sim in cyclone_dataset:
         cyclone_data = get_data_by_season(cyclone_dataset[sim], season=season)
@@ -273,6 +276,53 @@ def filter_events(cyclone_dataset, season='Cool',
                                           >= min_duration, drop=True)
         filtered_dataset[sim] = cyclone_data
     return filtered_dataset
+
+
+def rotate_cyclone(data, core_dims=None, axes=None):
+    if core_dims is None:
+        core_dims = ['x_c', 'y_c']
+    if axes is None:
+        axes = (-2, -1)
+    from scipy.ndimage import rotate
+    data_rotated = xr.apply_ufunc(rotate,
+                                  data.fillna(-9e9), data.angle,
+                                  kwargs={'reshape': False,
+                                          'cval': np.nan,
+                                          'order': 0,
+                                          'axes': axes},
+                                  input_core_dims=[core_dims, []],
+                                  output_core_dims=[core_dims],
+                                  vectorize=True,
+                                  dask='parallelized',
+                                  output_dtypes=['f8'])
+    data_rotated = xr.ones_like(data) * data_rotated
+    threshold = data.mean(core_dims) + 3 * data.std(core_dims)
+    data_rotated = data_rotated.where(np.abs(data_rotated) < threshold)
+    return data_rotated
+
+
+def isotropic_average(ds, min_radius=0, max_radius=1200, step=50):
+    bins = np.arange(min_radius, max_radius, step)
+    labels = bins[:-1] + np.diff(bins) / 2
+    list_of_ds = []
+    for i in range(len(bins) - 1):
+        ds_bin = (ds.where((bins[i] <= ds['distance_T']) &
+                           (ds['distance_T'] < bins[i + 1]))\
+                   .mean(('x_c', 'y_c')))
+        list_of_ds.append(ds_bin)
+    res = xr.concat(list_of_ds, dim=xr.DataArray(labels, dims='radius',
+                                                 name='radius'))
+    return res
+
+
+def compute_distance_to_centre(ds):
+    EARTH_RADIUS = 6371 * 1e3
+    lat_ref = ds.lat
+    dlat = ds.lat_T - ds.lat
+    dlon = ds.lon_T - ds.lon
+    dy = np.pi / 180. * EARTH_RADIUS * dlat
+    dx = (np.cos(np.pi / 180. * lat_ref) * np.pi / 180. * EARTH_RADIUS * dlon)
+    return np.sqrt(dx ** 2 + dy ** 2) * 1.e-3
 
 
 def align_cyclone_with_max_pressure_gradient(cyclone_dataset, lag=6, dt=6):
