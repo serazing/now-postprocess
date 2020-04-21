@@ -6,7 +6,7 @@ from setuptools import setup
 DISTNAME = 'now-postprocess'
 PACKAGES = ['nowpp', 'nowpp.models']
 TESTS = [p + '.tests' for p in PACKAGES]
-INSTALL_REQUIRES = ['xarray', 'numpy >= 1.11',
+INSTALL_REQUIRES = ['xarray', 'dask', 'numpy >= 1.11',
                     'matplotlib>=1.5',
                     'pandas', 'xgcm', 'pyyaml', 'zarr']
 TESTS_REQUIRE = ['pytest >= 2.7.1']

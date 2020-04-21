@@ -6,6 +6,7 @@ from .models import *
 from . import io
 from . import geometry
 from . import cyclone
+from .tools import start_client
 #from .models import nemo, wrf
 #from . import geometry
 #from . import plot
