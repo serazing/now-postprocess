@@ -17,6 +17,9 @@ description = ("Download NOW outputs from the MDSS storage using a configuration
 
 parser = argparse.ArgumentParser(description=description)
 parser.add_argument('config_file', nargs=1, help='Configuration file')
+parser.add_argument('--stage', action='store_true',
+                    help='Just stage the files on mdss but do not execute any '
+                         'download')
 parser.add_argument('--nemo', action='store_true',
                     help='Download NEMO files')
 parser.add_argument('--wrf', action='store_true',
@@ -49,6 +52,10 @@ if (not args.nemo) and (not args.wrf):
     print("You must select at least NEMO or WRF outputs to download")
     sys.exit(1)
 
+if args.stage:
+    cmd = 'stage'
+else:
+    cmd = 'get'
 
 for sim in simulations:
     for year in range(ystart, ystop + 1):
@@ -65,7 +72,7 @@ for sim in simulations:
 
                 origin = os.path.join(mdss_path, str(year), basename)
                 sh.mkdir('-p', dest)
-                sh.mdss('-P', mdss_project, 'get', origin, dest)
+                sh.mdss('-P', mdss_project, cmd, origin, dest)
         if args.wrf:
             model = 'wrf'
             print('Downloading WRF outputs (%s, year %s)' % (sim, year))
@@ -76,5 +83,5 @@ for sim in simulations:
             origin = os.path.join(mdss_path, str(year), basename)
             dest = cs.cfg.get_path(model, sim, 'raw') + '/'
             sh.mkdir('-p', dest)
-            sh.mdss('-P', mdss_project, 'get', origin, dest)
+            sh.mdss('-P', mdss_project, cmd, origin, dest)
 
