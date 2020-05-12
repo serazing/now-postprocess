@@ -237,8 +237,7 @@ class Cursor:
 
     def read(self, extension='', engine='zarr', variables=None, **kwargs):
         if self.where == 'raw':
-            filenames = sorted(glob.glob(os.path.join(self.path,
-                                                      self.basename)))
+            filenames = os.path.join(self.path, self.basename)
             # Case for opening raw NEMO outputs
             if self.model == 'nemo':
                 gdata = nemo.open_netcdf_dataset(filenames, 
@@ -246,7 +245,8 @@ class Cursor:
                                                  grid=self.grid, **kwargs)
             # Case for opening raw WRF outputs
             elif self.model == 'wrf':
-                gdata = wrf.open_netcdf_dataset(filenames, self.mesh_file,
+                gdata = wrf.open_netcdf_dataset(filenames,
+                                                mesh_file=self.mesh_file,
                                                 variables=variables,
                                                 **kwargs)
             else:
