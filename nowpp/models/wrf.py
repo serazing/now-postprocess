@@ -69,8 +69,6 @@ def open_netcdf_dataset(files, mesh_file=None, grid='T', variables=None,
                         **kwargs):
     ds = xr.open_mfdataset(files, concat_dim='Time', combine='nested',
                            drop_variables=['XLON', 'XLAT'], **kwargs)
-    if variables is not None:
-        ds = ds[variables]
     ds = ds.rename_dims(WRF_NEW_DIMS)
     ds = ds.isel(x_g=slice(None, -1), y_g=slice(None, -1))
     time = pd.to_datetime(ds.Times.load().astype('str'),
@@ -78,6 +76,8 @@ def open_netcdf_dataset(files, mesh_file=None, grid='T', variables=None,
     ds = ds.assign_coords(Time=time).rename({'Time': 'time'})
     mesh = read_mesh(mesh_file)
     ds = ds.assign_coords(mesh.variables)
+    if variables is not None:
+        ds = ds[variables]
     return ds
 
 

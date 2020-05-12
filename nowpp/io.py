@@ -1,5 +1,6 @@
 import xarray as xr
 import os
+import glob
 import sh
 import pandas as pd
 from .models import nemo, wrf
@@ -234,9 +235,10 @@ class Cursor:
             self._update_where(kwargs['where'])
         self._full_update()
 
-    def read(self,  extension='', engine='zarr', **kwargs):
+    def read(self, extension='', engine='zarr', variables=None, **kwargs):
         if self.where == 'raw':
-            filenames = os.path.join(self.path, self.basename)
+            filenames = sorted(glob.glob(os.path.join(self.path,
+                                                      self.basename)))
             # Case for opening raw NEMO outputs
             if self.model == 'nemo':
                 gdata = nemo.open_netcdf_dataset(filenames, 
@@ -245,6 +247,7 @@ class Cursor:
             # Case for opening raw WRF outputs
             elif self.model == 'wrf':
                 gdata = wrf.open_netcdf_dataset(filenames, self.mesh_file,
+                                                variables=variables,
                                                 **kwargs)
             else:
                 raise ValueError("Cannot recognise this type of model")
@@ -381,7 +384,7 @@ class DataBase:
         return gdata
 
     def open(self, simulations=None, grids=None, model='nemo', where='raw',
-             extension='', **kwargs):
+             extension='', variables=None, **kwargs):
         if model is None:
             model = self.model
         if simulations is None:
@@ -392,7 +395,8 @@ class DataBase:
             if model == 'nemo' and where == 'raw':
                 gdata = self._combine_grids(grids, **kwargs)
             else:
-                gdata = self.cs.read(extension=extension, **kwargs)
+                gdata = self.cs.read(extension=extension,
+                                     variables=variables, **kwargs)
             list_of_gdata.append(gdata)
         return xr.concat(list_of_gdata, dim='simulation')
 
@@ -434,7 +438,7 @@ class DataBase:
             return ds.mean(**kwargs)
         return func(dim=dim)
 
-    def std(self, dim=None, write=False, save_engine='netcdf'):
+    def std(self, dim=None, write=False, engine='netcdf'):
         @apply_to_database(self, engine=engine,
                            extension='_std', write=write)
         def func(ds, **kwargs):
