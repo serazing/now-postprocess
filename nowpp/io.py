@@ -130,7 +130,7 @@ class Config:
                                                ystop, dim)
         elif model == 'wrf':
             domain = 1
-            prefix = self.conf['models'][model]['frequency']
+            prefix = self.conf['models'][model]['prefix']
             if where == 'raw':
                 basename = '%s_d%02i_????-??-??_00:00:00' % (prefix, domain)
             else:
@@ -237,7 +237,8 @@ class Cursor:
 
     def read(self, extension='', engine='zarr', variables=None, **kwargs):
         if self.where == 'raw':
-            filenames = os.path.join(self.path, self.basename)
+            filenames = sorted(glob.glob(os.path.join(self.path,
+                                                      self.basename)))
             # Case for opening raw NEMO outputs
             if self.model == 'nemo':
                 gdata = nemo.open_netcdf_dataset(filenames, 
